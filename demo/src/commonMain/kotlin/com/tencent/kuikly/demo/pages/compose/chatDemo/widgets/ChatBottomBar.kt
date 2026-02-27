@@ -1,6 +1,7 @@
 package com.tencent.kuikly.demo.pages.compose.chatDemo.widgets
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -11,6 +12,7 @@ import com.tencent.kuikly.compose.foundation.Image
 import com.tencent.kuikly.compose.foundation.background
 import com.tencent.kuikly.compose.foundation.clickable
 import com.tencent.kuikly.compose.foundation.layout.Box
+import com.tencent.kuikly.compose.foundation.layout.Column
 import com.tencent.kuikly.compose.foundation.layout.Row
 import com.tencent.kuikly.compose.foundation.layout.RowScope
 import com.tencent.kuikly.compose.foundation.layout.Spacer
@@ -41,6 +43,8 @@ import com.tencent.kuikly.compose.ui.Modifier
 import com.tencent.kuikly.compose.ui.draw.alpha
 import com.tencent.kuikly.compose.ui.draw.clip
 import com.tencent.kuikly.compose.ui.draw.rotate
+import com.tencent.kuikly.compose.ui.focus.FocusRequester
+import com.tencent.kuikly.compose.ui.focus.focusRequester
 import com.tencent.kuikly.compose.ui.graphics.Color
 import com.tencent.kuikly.compose.ui.text.TextStyle
 import com.tencent.kuikly.compose.ui.unit.Dp
@@ -83,6 +87,10 @@ class ChatBottomBarState(
     // 切换语音/文本模式
     fun toggleVoiceMode() {
         isVoiceMode.value = !isVoiceMode.value
+        // 切换到语音模式时重置键盘高度
+        if (isVoiceMode.value) {
+            keyboardHeight.value = 0f
+        }
     }
     
     // 切换扩展面板
@@ -139,7 +147,9 @@ fun rememberChatBottomBarState(
  * @param onExpandClick 展开按钮点击回调
  * @param onKeyboardHeightChange 键盘高度变化回调，用于外部处理键盘附着效果
  * @param modifier 修饰符
- * @param voiceInputContent 语音输入自定义内容
+ * @param voiceInputState 语音输入状态（可选，用于自定义语音输入）
+ * @param onVoiceRecordStart 语音录音开始回调
+ * @param onVoiceRecordEnd 语音录音结束回调（shouldSend: 是否发送，text: 识别的文字）
  * @param extensionPanelContent 扩展面板自定义内容
  */
 @Composable
@@ -154,146 +164,190 @@ fun ChatBottomBar(
     onExpandClick: () -> Unit = {},
     onKeyboardHeightChange: (KeyboardParams) -> Unit = {},
     modifier: Modifier = Modifier,
-    voiceInputContent: @Composable (() -> Unit)? = null,
+    voiceInputState: VoiceInputState? = null,
+    onVoiceRecordStart: () -> Unit = {},
+    onVoiceRecordEnd: (shouldSend: Boolean, text: String) -> Unit = { _, _ -> },
     extensionPanelContent: @Composable (() -> Unit)? = null
 ) {
+    // 如果未传入语音输入状态，则创建一个内部状态
+    val internalVoiceState = rememberVoiceInputState()
+    val voiceState = voiceInputState ?: internalVoiceState
+    
     // 键盘高度变化处理回调 - 需要应用在 TextField 上
     val handleKeyboardHeightChange: (KeyboardParams) -> Unit = { params ->
         state.keyboardHeight.value = params.height
         onKeyboardHeightChange(params)
     }
     
-    // 外层容器 - 白色背景 + 顶部圆角
-    Box(
-        modifier = modifier
-            .padding(bottom = bottomSafeArea)
-            .background(
-                config.backgroundColor,
-                RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-            )
-            .clickable { /* 拦截点击事件 */ }
-    ) {
-        Row(
+    // 外层容器 - 使用 Box 叠加录音视图
+    Box(modifier = modifier) {
+        // 底部输入栏 - 安全距离在背景内部
+        Column(
             modifier = Modifier
+                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .wrapContentHeight()
-                .padding(
-                    start = config.horizontalPadding,
-                    top = config.topPadding,
-                    end = config.horizontalPadding,
-                    bottom = config.bottomPadding
-                ),
-            verticalAlignment = Alignment.Bottom
+                .background(
+                    config.backgroundColor,
+                    RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                )
+                .clickable { /* 拦截点击事件 */ }
         ) {
-            // 左侧：语音按钮
-            if (config.enableVoiceInput && config.voiceButton != null) {
-                BottomVoiceIcon(
-                    state = state,
-                    config = config,
-                    onVoiceClick = {
-                        state.toggleVoiceMode()
-                        onVoiceClick()
-                    }
-                )
-            }
-            
-            // 中间：输入框区域
-            // 最小高度：与左右图标等高，最大高度：6行，超出滚动
-            Box(
-                contentAlignment = Alignment.CenterStart,
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = config.iconSize, max = TEXT_INPUT_BG_MAX_HEIGHT)
-                    .background(config.inputBackgroundColor)
-            ) {
-                val colors = TextFieldDefaults.colors(
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedContainerColor = Color.Transparent,
-                    cursorColor = config.cursorColor,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent
-                )
-                val interactionSource = remember { MutableInteractionSource() }
-                BasicTextField(
-                    value = state.inputText.value,
-                    onValueChange = { newValue ->
-                        if (config.maxInputLength == 0 && newValue.isNotEmpty()) {
-                            state.inputText.value = ""
-                            return@BasicTextField
-                        }
-                        state.inputText.value = newValue
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 0.dp, max = TEXT_INPUT_BG_MAX_HEIGHT)
-                        .keyboardHeightChange(handleKeyboardHeightChange),
-                    textStyle = TextStyle(
-                        color = config.textColor,
-                        fontSize = TEXT_INPUT_FONT_SIZE.sp,
-                        lineHeight = (TEXT_INPUT_FONT_SIZE * TEXT_INPUT_LINE_HEIGHT_MULTIPLIER).sp
+                    .fillMaxWidth()
+                    .wrapContentHeight()
+                    .padding(
+                        start = config.horizontalPadding,
+                        top = config.topPadding,
+                        end = config.horizontalPadding,
+                        bottom = config.bottomPadding
                     ),
-                    singleLine = false,
-                    minLines = TEXT_INPUT_MIN_LINES,
-                    maxLines = TEXT_INPUT_MAX_LINES,
-                    interactionSource = interactionSource,
-                    cursorBrush = SolidColor(config.cursorColor),
-                    decorationBox = @OptIn(ExperimentalMaterial3Api::class) @Composable { innerTextField ->
-                        TextFieldDefaults.DecorationBox(
-                            value = state.inputText.value,
-                            innerTextField = innerTextField,
-                            enabled = true,
-                            singleLine = false,
-                            visualTransformation = VisualTransformation.None,
-                            interactionSource = interactionSource,
-                            placeholder = {
-                                Text(
-                                    text = config.placeholder,
-                                    fontSize = TEXT_INPUT_FONT_SIZE.sp,
-                                    maxLines = 1,
-                                    color = config.placeholderColor,
-                                )
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 左侧：语音按钮
+                if (config.enableVoiceInput && config.voiceButton != null) {
+                    BottomVoiceIcon(
+                        state = state,
+                        config = config,
+                        onVoiceClick = {
+                            state.toggleVoiceMode()
+                            onVoiceClick()
+                        }
+                    )
+                }
+                
+                // 中间：输入框区域
+                // 语音模式：显示"按住 说话"按钮
+                // 文本模式：显示输入框
+                // 输入框焦点控制
+                val focusRequester = remember { FocusRequester() }
+                
+                // 语音模式切换到文本模式时自动聚焦
+                LaunchedEffect(state.isVoiceMode.value) {
+                    if (!state.isVoiceMode.value) {
+                        focusRequester.requestFocus()
+                    }
+                }
+                
+                Box(
+                    contentAlignment = Alignment.CenterStart,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = config.iconSize)
+                        .background(config.inputBackgroundColor)
+                ) {
+                    if (state.isVoiceMode.value) {
+                        // 语音模式：显示"按住 说话"按钮
+                        VoiceInputStyleLayout(
+                            state = voiceState,
+                            onPressDown = {
+                                onVoiceRecordStart()
                             },
-                            colors = colors,
-                            contentPadding = PaddingValues(0.dp),
+                            onPressUp = { shouldSend ->
+                                val recognizedText = voiceState.currentAudioText.value
+                                onVoiceRecordEnd(shouldSend, recognizedText)
+                            }
+                        )
+                    } else {
+                        // 文本模式：显示输入框
+                        val colors = TextFieldDefaults.colors(
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent,
+                            cursorColor = config.cursorColor,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent
+                        )
+                        val interactionSource = remember { MutableInteractionSource() }
+                        
+                        BasicTextField(
+                            value = state.inputText.value,
+                            onValueChange = { newValue ->
+                                if (config.maxInputLength == 0 && newValue.isNotEmpty()) {
+                                    state.inputText.value = ""
+                                    return@BasicTextField
+                                }
+                                state.inputText.value = newValue
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = TEXT_INPUT_BG_MIN_HEIGHT)
+                                .wrapContentHeight()
+                                .heightIn(max = TEXT_INPUT_BG_MAX_HEIGHT)
+                                .focusRequester(focusRequester)
+                                .keyboardHeightChange(handleKeyboardHeightChange),
+                            textStyle = TextStyle(
+                                color = config.textColor,
+                                fontSize = TEXT_INPUT_FONT_SIZE.sp,
+                                lineHeight = (TEXT_INPUT_FONT_SIZE * TEXT_INPUT_LINE_HEIGHT_MULTIPLIER).sp
+                            ),
+                            singleLine = false,
+                            interactionSource = interactionSource,
+                            cursorBrush = SolidColor(config.cursorColor),
+                            decorationBox = @OptIn(ExperimentalMaterial3Api::class) @Composable { innerTextField ->
+                                TextFieldDefaults.DecorationBox(
+                                    value = state.inputText.value,
+                                    innerTextField = innerTextField,
+                                    enabled = true,
+                                    singleLine = false,
+                                    visualTransformation = VisualTransformation.None,
+                                    interactionSource = interactionSource,
+                                    placeholder = {
+                                        Text(
+                                            text = config.placeholder,
+                                            fontSize = TEXT_INPUT_FONT_SIZE.sp,
+                                            maxLines = 1,
+                                            color = config.placeholderColor,
+                                        )
+                                    },
+                                    colors = colors,
+                                    contentPadding = PaddingValues(0.dp),
+                                )
+                            }
                         )
                     }
-                )
-
-                // 语音输入覆盖层
-                if (state.isVoiceMode.value && voiceInputContent != null) {
-                    voiceInputContent()
                 }
+                
+                // 右侧按钮区域
+                RightButtonsArea(
+                    state = state,
+                    config = config,
+                    onSend = {
+                        val text = state.inputText.value
+                        state.clearInput()
+                        onSend(text)
+                    },
+                    onStop = {
+                        state.stopGenerating()
+                        onStop()
+                    },
+                    onExtensionClick = {
+                        state.toggleExtensionPanel()
+                        onExtensionClick()
+                    }
+                )
             }
             
-            // 右侧按钮区域
-            RightButtonsArea(
-                state = state,
-                config = config,
-                onSend = {
-                    val text = state.inputText.value
-                    state.clearInput()
-                    onSend(text)
-                },
-                onStop = {
-                    state.stopGenerating()
-                    onStop()
-                },
-                onExtensionClick = {
-                    state.toggleExtensionPanel()
-                    onExtensionClick()
-                }
-            )
+            // 扩展面板
+            if (state.showExtensionPanel.value && extensionPanelContent != null) {
+                extensionPanelContent()
+            }
+            
+            // 底部安全距离 - 参考 QQAIBiz AppBottom，一直保持显示
+            // 偏移计算会根据键盘高度正确处理
+            if (bottomSafeArea > 0.dp) {
+                Spacer(modifier = Modifier.height(bottomSafeArea))
+            }
         }
         
-        // 扩展面板
-        if (state.showExtensionPanel.value && extensionPanelContent != null) {
-            extensionPanelContent()
+        // 语音录制视图 - 覆盖在底部栏上方
+        if (voiceState.isShowRecordView.value) {
+            VoiceRecordView(state = voiceState)
         }
     }
 }
 
 /**
- * 左侧语音按钮 - 使用 CDN 图片
+ * 语音按钮图标
  */
 @OptIn(InternalResourceApi::class)
 @Composable
@@ -345,19 +399,22 @@ private fun RowScope.RightButtonsArea(
         )
     }
     
-    // 流式状态显示停止按钮，否则显示发送按钮
+    // 流式状态显示停止按钮
     if (state.isGenerating.value && config.stopButton != null) {
         BottomStopButton(
             config = config,
             onClick = onStop
         )
     } else if (config.sendButton != null) {
-        // 发送按钮 - 常驻显示
-        BottomSendButton(
-            state = state,
-            config = config,
-            onClick = onSend
-        )
+        // 发送按钮 - 只在文本输入模式且有文本内容时显示
+        val showSendButton = !state.isVoiceMode.value && state.inputText.value.isNotBlank()
+        if (showSendButton) {
+            BottomSendButton(
+                state = state,
+                config = config,
+                onClick = onSend
+            )
+        }
     }
 }
 

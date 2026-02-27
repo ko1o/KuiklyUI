@@ -12,29 +12,20 @@ val BOTTOM_BAR_DEFAULT_HEIGHT = 72f.dp
 /** 输入框字体大小 */
 const val TEXT_INPUT_FONT_SIZE = 16f
 
-/** 输入框行高倍数（行高 = 字体大小 * 行高倍数） */
-const val TEXT_INPUT_LINE_HEIGHT_MULTIPLIER = 1.4f
+/** 输入框行高倍数（行高 = 字体大小 * 行高倍数） - 参考 QQAIBiz 1.25f */
+const val TEXT_INPUT_LINE_HEIGHT_MULTIPLIER = 1.25f
 
 /** 单行文字高度 */
 val SINGLE_LINE_HEIGHT = (TEXT_INPUT_FONT_SIZE * TEXT_INPUT_LINE_HEIGHT_MULTIPLIER).dp
 
-/** 输入框最小行数 */
-const val TEXT_INPUT_MIN_LINES = 1
-
-/** 输入框最大行数 */
-const val TEXT_INPUT_MAX_LINES = 6
-
-/** 输入框内边距（上下） */
-const val TEXT_INPUT_VERTICAL_PADDING = 0f
-
-/** 输入框背景最小高度 - 1行高度 + 内边距 */
-val TEXT_INPUT_BG_MIN_HEIGHT = (SINGLE_LINE_HEIGHT.value + TEXT_INPUT_VERTICAL_PADDING * 2).dp
-
-/** 输入框背景最大高度 - 6行高度 + 内边距 */
-val TEXT_INPUT_BG_MAX_HEIGHT = (SINGLE_LINE_HEIGHT.value * TEXT_INPUT_MAX_LINES + TEXT_INPUT_VERTICAL_PADDING * 2).dp
-
-/** 输入框上下内边距 */
+/** 输入框上下内边距 - 参考 QQAIBiz textInputTopPadding */
 const val TEXT_INPUT_TOP_PADDING = 4f
+
+/** 输入框背景最小高度 - 参考 QQAIBiz textInputBGMinHeight = 32f + aiFontScaleAddSize */
+val TEXT_INPUT_BG_MIN_HEIGHT = 32f.dp
+
+/** 输入框背景最大高度 - 参考 QQAIBiz textInputBGMaxHeight = 152f */
+val TEXT_INPUT_BG_MAX_HEIGHT = 152f.dp
 
 // ==================== CDN 图片链接（来自 QQAIBiz AIProductUIToken.CDN） ====================
 

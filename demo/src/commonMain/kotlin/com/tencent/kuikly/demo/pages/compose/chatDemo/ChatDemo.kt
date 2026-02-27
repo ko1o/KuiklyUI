@@ -29,6 +29,7 @@ import com.tencent.kuikly.compose.foundation.layout.padding
 import com.tencent.kuikly.compose.foundation.layout.size
 import com.tencent.kuikly.compose.foundation.layout.width
 import com.tencent.kuikly.compose.foundation.layout.widthIn
+import com.tencent.kuikly.compose.foundation.layout.PaddingValues
 import com.tencent.kuikly.compose.foundation.lazy.LazyColumn
 import com.tencent.kuikly.compose.foundation.lazy.LazyRow
 import com.tencent.kuikly.compose.foundation.lazy.items
@@ -53,6 +54,9 @@ import com.tencent.kuikly.compose.ui.text.font.FontWeight
 import com.tencent.kuikly.compose.ui.unit.Dp
 import com.tencent.kuikly.compose.ui.unit.dp
 import com.tencent.kuikly.compose.ui.unit.sp
+import com.tencent.kuikly.compose.animation.core.animateFloatAsState
+import com.tencent.kuikly.compose.animation.core.tween
+import com.tencent.kuikly.compose.ui.platform.LocalFocusManager
 import com.tencent.kuikly.core.annotations.Page
 import com.tencent.kuikly.core.base.ColorStop
 import com.tencent.kuikly.core.base.Direction
@@ -86,17 +90,81 @@ internal class ChatDemo : ComposeContainer() {
         var inputText by remember { mutableStateOf("") }
         val chatList = remember { mutableStateListOf<String>() }
         
-        // 键盘高度状态 - 用于实现输入框跟随键盘附着
+        // FocusManager 用于收起键盘
+        val focusManager = LocalFocusManager.current
+        
+        // 键盘高度状态
         var keyboardHeight by remember { mutableStateOf(0f) }
         
-        // 底部安全区高度（用于键盘弹出时的偏移计算）
-        val bottomSafeArea = pagerData.safeAreaInsets.bottom
+        // 键盘动画时长（毫秒）
+        var keyboardAnimDuration by remember { mutableStateOf(250) }
+        
+        // 底部安全区高度
+        // Android 上使用 androidBottomBavBarHeight，iOS 使用 safeAreaInsets.bottom
+        // 参考 QQAIBiz: max(safeAreaInsets.bottom, 34f) 确保至少有最小值
+        val bottomSafeArea = if (pagerData.isAndroid) {
+            maxOf(pagerData.androidBottomBavBarHeight, 34f)
+        } else {
+            maxOf(pagerData.safeAreaInsets.bottom, 34f)
+        }
+        
+        // 底部栏默认高度（包括输入框高度 + padding）
+        val bottomBarDefaultHeight = 56f
+        
+        // 参考 QQAIBiz: marginBottom = layoutChatBottomDefaultHeight + offsetForNavBar
+        // 内容区域底部边距 = 底部栏高度 + 底部安全区（固定值）
+        val marginBottom = remember { bottomBarDefaultHeight + bottomSafeArea }
+        
+        // 内容区域高度 = 页面高度 - marginBottom（固定值，不随键盘变化）
+        val contentHeight = remember { pagerData.pageViewHeight - marginBottom }
+        
+        // 参考 QQAIBiz: 底部栏位移 = -keyboardHeight + offsetForNavBar（键盘弹出时向上移动）
+        // 键盘展开时，底部栏需要向上移动的距离
+        // 注意：底部栏内部有 bottomSafeArea 的空间，键盘弹出时会隐藏这部分空间
+        // 所以偏移量 = -keyboardHeight + bottomSafeArea（即 QQAIBiz 的 offsetForNavBar）
+        val bottomBarOffset = -keyboardHeight + (bottomBarDefaultHeight - bottomSafeArea)
+        
+        // 列表需要额外避让的高度（键盘弹出时列表底部需要留出空间）
+        val listBottomPadding = if (keyboardHeight > 0f) {
+            keyboardHeight - bottomSafeArea
+        } else {
+            0f
+        }
+        
+        // 底部栏位移动画
+        val animatedBottomOffset by animateFloatAsState(
+            targetValue = bottomBarOffset,
+            animationSpec = tween(durationMillis = keyboardAnimDuration)
+        )
+        
+        // 列表底部 padding 动画
+        val animatedListPadding by animateFloatAsState(
+            targetValue = listBottomPadding,
+            animationSpec = tween(durationMillis = keyboardAnimDuration)
+        )
 
         // 聊天列表滚动状态
         val listState = rememberLazyListState()
         
+        // 标记是否为程序化滚动（非用户手动滚动）
+        var isProgrammaticScroll by remember { mutableStateOf(false) }
+        
+        // 滚动时收起键盘（只在用户手动触发滚动时收起，程序化滚动不收起）
+        LaunchedEffect(listState.isScrollInProgress) {
+            if (listState.isScrollInProgress && !isProgrammaticScroll) {
+                focusManager.clearFocus()
+            }
+            // 滚动结束后重置标志
+            if (!listState.isScrollInProgress) {
+                isProgrammaticScroll = false
+            }
+        }
+        
         // 使用通用底部输入栏组件状态
         val bottomBarState = rememberChatBottomBarState()
+        
+        // 语音输入状态
+        val voiceInputState = rememberVoiceInputState()
         
         // 同步输入文本状态
         LaunchedEffect(inputText) {
@@ -109,17 +177,27 @@ internal class ChatDemo : ComposeContainer() {
                 inputText = bottomBarState.inputText.value
             }
         }
+        
+        // 切换到语音模式时重置键盘高度
+        LaunchedEffect(bottomBarState.isVoiceMode.value) {
+            if (bottomBarState.isVoiceMode.value) {
+                keyboardHeight = 0f
+            }
+        }
 
+        // 根布局 - 整个页面高度固定
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .height(pagerData.pageViewHeight.dp)
                 .background(Color(0xFFF4F4FE))
         ) {
-            // 主内容区域 - 需要根据键盘高度调整
+            // 主内容区域 - 高度固定，不随键盘变化
+            // 参考 QQAIBiz: Column height = contentHeight（固定值）
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = if (keyboardHeight > 0) keyboardHeight.dp else 0.dp)
+                    .fillMaxWidth()
+                    .height(contentHeight.dp)
             ) {
                 // 状态栏占位
                 Spacer(modifier = Modifier.height(pagerData.statusBarHeight.dp))
@@ -129,56 +207,78 @@ internal class ChatDemo : ComposeContainer() {
                     getPager().acquireModule<RouterModule>(RouterModule.MODULE_NAME).closePage()
                 })
 
-                // 聊天列表
-                if (chatList.isNotEmpty()) {
-                    LazyColumn(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        state = listState
-                    ) {
-                        itemsIndexed(chatList) { index, message ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 6.dp, vertical = 6.dp),
-                                horizontalArrangement = if (index % 2 == 0) Arrangement.End else Arrangement.Start
-                            ) {
-                                ChatMessageItem(
-                                    message = message,
-                                    isUser = (index % 2 == 0),
-                                    maxWidth = (0.7f * pagerData.pageViewWidth).dp
-                                )
+                // 聊天列表 - 使用 weight 填充内容区域剩余空间
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    if (chatList.isNotEmpty()) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            state = listState,
+                            // 列表底部留出空间，键盘弹出时避让
+                            contentPadding = PaddingValues(
+                                bottom = animatedListPadding.dp
+                            )
+                        ) {
+                            itemsIndexed(chatList) { index, message ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 6.dp, vertical = 6.dp),
+                                    horizontalArrangement = if (index % 2 == 0) Arrangement.End else Arrangement.Start
+                                ) {
+                                    ChatMessageItem(
+                                        message = message,
+                                        isUser = (index % 2 == 0),
+                                        maxWidth = (0.7f * pagerData.pageViewWidth).dp
+                                    )
+                                }
+                            }
+                            item {
+                                Spacer(modifier = Modifier.height(8.dp))
                             }
                         }
-                        item {
-                            Spacer(modifier = Modifier.height(1.dp))
+                        // 消息列表变化或键盘弹出时滚动到底部
+                        LaunchedEffect(chatList.size, keyboardHeight) {
+                            if (chatList.isNotEmpty()) {
+                                isProgrammaticScroll = true
+                                listState.animateScrollToItem(chatList.size)
+                            }
                         }
+                    } else {
+                        welcome(
+                            onInputTextChange = { inputText = it },
+                            modifier = Modifier.fillMaxSize(),
+                            listState = listState,
+                            contentPadding = PaddingValues(bottom = animatedListPadding.dp)
+                        )
                     }
-                    // 键盘弹出或消息列表变化时滚动到底部
-                    LaunchedEffect(chatList.size, keyboardHeight) {
-                        if (chatList.isNotEmpty()) {
-                            listState.animateScrollToItem(chatList.size)
-                        }
-                    }
-                } else {
-                    welcome(
-                        onInputTextChange = { inputText = it },
-                        modifier = Modifier.weight(1f)
-                    )
                 }
+            }
 
-                // 底部输入栏 - 跟随键盘附着，使用带语音和扩展功能的配置
-                // 当键盘弹出时，不需要额外的 bottomSafeArea（键盘已覆盖安全区域）
-                // 但需要保留一定的底部间距，避免太贴近键盘
-                val keyboardBottomPadding = if (keyboardHeight > 0) 16.dp else bottomSafeArea.dp
+            // 底部输入栏容器 - 参考 QQAIBiz: AppBottom 使用全屏高度容器 + transform 偏移
+            // 使用 Column 包裹，高度为全屏，从顶部向下填充空白，确保底部栏内容不会被裁剪
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(pagerData.pageViewHeight.dp)
+                    .offset(y = animatedBottomOffset.dp)
+            ) {
+                // 占位空间：页面高度 - 底部栏高度 - 底部安全区
+                Spacer(modifier = Modifier.weight(1f))
+                
+                // 底部输入栏
                 ChatBottomBar(
                     state = bottomBarState,
-                    bottomSafeArea = keyboardBottomPadding,
+                    bottomSafeArea = bottomSafeArea.dp,
                     config = fullFeatureChatBottomBarConfig(
                         pageId = "ChatDemo",
                         placeholder = PLACEHOLDER
                     ),
+                    modifier = Modifier.fillMaxWidth(),
+                    voiceInputState = voiceInputState,
                     onSend = { messageToSend ->
                         chatList.add(messageToSend)
                         bottomBarState.startGenerating()
@@ -199,8 +299,32 @@ internal class ChatDemo : ComposeContainer() {
                         // 扩展面板点击
                     },
                     onKeyboardHeightChange = { params ->
-                        // 更新键盘高度，实现输入框跟随键盘附着
+                        // 更新键盘高度和动画时长
+                        keyboardAnimDuration = params.duration.toInt()
                         keyboardHeight = params.height
+                    },
+                    onVoiceRecordStart = {
+                        // 开始录音 - 这里应该调用实际的录音接口
+                        // TODO: 接入实际的录音模块 AIRealTimeRecorderModule
+                        // 模拟录音：更新识别文字
+                        voiceInputState.currentAudioText.value = "这是模拟的语音识别文字"
+                    },
+                    onVoiceRecordEnd = { shouldSend, text ->
+                        // 结束录音 - 如果需要发送且有识别文字，则发送消息
+                        if (shouldSend && text.isNotEmpty()) {
+                            chatList.add(text)
+                            // 模拟 AI 回复
+                            bottomBarState.startGenerating()
+                            GlobalScope.launch {
+                                chatList.add("")
+                                val response = "收到您的语音消息：\"$text\"\n\n正在为您处理..."
+                                response.forEachIndexed { index, _ ->
+                                    delay(16)
+                                    chatList[chatList.lastIndex] = response.substring(0, index + 1)
+                                }
+                                bottomBarState.stopGenerating()
+                            }
+                        }
                     }
                 )
             }
@@ -248,70 +372,80 @@ internal class ChatDemo : ComposeContainer() {
     }
 
     @Composable
-    fun welcome(onInputTextChange: (String) -> Unit,
-                modifier: Modifier = Modifier) {
-        Column(
+    fun welcome(
+        onInputTextChange: (String) -> Unit,
+        modifier: Modifier = Modifier,
+        listState: com.tencent.kuikly.compose.foundation.lazy.LazyListState = rememberLazyListState(),
+        contentPadding: PaddingValues = PaddingValues(0.dp)
+    ) {
+        // 使用循环生成卡片 - 艺术化设计
+        val promptBoxes = listOf(
+            PromptBox(
+                "\uD83C\uDF93 高考志愿分析",
+                "请帮我分析高考志愿填报方案，结合我的成绩和兴趣给出建议",
+                "高考之路，有我护航",
+                Color(0xFFCDC4BB)
+            ),
+            PromptBox(
+                "\u26BD 世界杯观赛助手",
+                "分析今天的世界杯战况如何",
+                "分析比赛战况",
+                Color(0xFFFEE1D3)
+            ),
+            PromptBox(
+                "\u2600\uFE0F 医学健康助手",
+                "请给出健康生活建议",
+                "专业、科学",
+                Color(0xFFF6BEBD)
+            ),
+            PromptBox(
+                "\uD83C\uDF89 高考送祝福",
+                "请写一段高考祝福语，祝考生金榜题名",
+                "祝各位考生金榜题名",
+                Color(0xFFCFAAA1)
+            ),
+            PromptBox(
+                "\uD83D\uDCDA 学习计划助手",
+                "帮我制定一个高效的学习计划，提升学习效率",
+                "科学规划，高效学习",
+                Color(0xFFD4E4F7)
+            ),
+            PromptBox(
+                "\uD83C\uDFA8 创意写作助手",
+                "帮我写一篇富有创意的短文或故事",
+                "激发灵感，妙笔生花",
+                Color(0xFFE8D5F2)
+            )
+        )
+
+        LazyColumn(
             modifier = modifier,
-            horizontalAlignment = Alignment.CenterHorizontally
+            state = listState,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            contentPadding = contentPadding
         ) {
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Kuikly logo
-            @OptIn(InternalResourceApi::class)
-            val logoDrawable = DrawableResource(ImageUri.pageAssets(LOGO_ICON).toUrl("ChatDemo"))
-            Image(
-                painter = painterResource(logoDrawable),
-                contentDescription = "Kuikly Logo",
-                modifier = Modifier
-                    .width(240.dp)
-                    .height(70.dp)
-            )
+            item {
+                Spacer(modifier = Modifier.height(32.dp))
+            }
             
-            Spacer(modifier = Modifier.height(40.dp))
-
-            // 使用循环生成卡片 - 艺术化设计
-            val promptBoxes = listOf(
-                PromptBox(
-                    "\uD83C\uDF93 高考志愿分析",
-                    "请帮我分析高考志愿填报方案，结合我的成绩和兴趣给出建议",
-                    "高考之路，有我护航",
-                    Color(0xFFCDC4BB)
-                ),
-                PromptBox(
-                    "\u26BD 世界杯观赛助手",
-                    "分析今天的世界杯战况如何",
-                    "分析比赛战况",
-                    Color(0xFFFEE1D3)
-                ),
-                PromptBox(
-                    "\u2600\uFE0F 医学健康助手",
-                    "请给出健康生活建议",
-                    "专业、科学",
-                    Color(0xFFF6BEBD)
-                ),
-                PromptBox(
-                    "\uD83C\uDF89 高考送祝福",
-                    "请写一段高考祝福语，祝考生金榜题名",
-                    "祝各位考生金榜题名",
-                    Color(0xFFCFAAA1)
-                ),
-                PromptBox(
-                    "\uD83D\uDCDA 学习计划助手",
-                    "帮我制定一个高效的学习计划，提升学习效率",
-                    "科学规划，高效学习",
-                    Color(0xFFD4E4F7)
-                ),
-                PromptBox(
-                    "\uD83C\uDFA8 创意写作助手",
-                    "帮我写一篇富有创意的短文或故事",
-                    "激发灵感，妙笔生花",
-                    Color(0xFFE8D5F2)
+            item {
+                // Kuikly logo
+                @OptIn(InternalResourceApi::class)
+                val logoDrawable = DrawableResource(ImageUri.pageAssets(LOGO_ICON).toUrl("ChatDemo"))
+                Image(
+                    painter = painterResource(logoDrawable),
+                    contentDescription = "Kuikly Logo",
+                    modifier = Modifier
+                        .width(240.dp)
+                        .height(70.dp)
                 )
-            )
-            // kuikly logo
+            }
+            
+            item {
+                Spacer(modifier = Modifier.height(40.dp))
+            }
 
-            promptBoxes.forEachIndexed { _, box ->
-                
+            items(promptBoxes) { box ->
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -351,7 +485,10 @@ internal class ChatDemo : ComposeContainer() {
                 }
                 Spacer(modifier = Modifier.height(10.dp))
             }
-
+            
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
         }
     }
 
