@@ -1,5 +1,8 @@
 package com.tencent.kuikly.demo.pages.compose.chatDemo
 
+import com.tencent.kuikly.demo.pages.compose.chatDemo.configs.*
+import com.tencent.kuikly.demo.pages.compose.chatDemo.widgets.*
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -8,7 +11,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.setValue
 import com.tencent.kuikly.compose.ComposeContainer
-import com.tencent.kuikly.compose.extension.keyboardHeightChange
 import com.tencent.kuikly.compose.foundation.Canvas
 import com.tencent.kuikly.compose.foundation.Image
 import com.tencent.kuikly.compose.foundation.background
@@ -18,9 +20,11 @@ import com.tencent.kuikly.compose.foundation.layout.Box
 import com.tencent.kuikly.compose.foundation.layout.Column
 import com.tencent.kuikly.compose.foundation.layout.Row
 import com.tencent.kuikly.compose.foundation.layout.Spacer
+import com.tencent.kuikly.compose.foundation.layout.fillMaxHeight
 import com.tencent.kuikly.compose.foundation.layout.fillMaxSize
 import com.tencent.kuikly.compose.foundation.layout.fillMaxWidth
 import com.tencent.kuikly.compose.foundation.layout.height
+import com.tencent.kuikly.compose.foundation.layout.offset
 import com.tencent.kuikly.compose.foundation.layout.padding
 import com.tencent.kuikly.compose.foundation.layout.size
 import com.tencent.kuikly.compose.foundation.layout.width
@@ -32,6 +36,7 @@ import com.tencent.kuikly.compose.foundation.lazy.itemsIndexed
 import com.tencent.kuikly.compose.foundation.lazy.rememberLazyListState
 import com.tencent.kuikly.compose.foundation.shape.CircleShape
 import com.tencent.kuikly.compose.foundation.shape.RoundedCornerShape
+import com.tencent.kuikly.compose.material3.Button
 import com.tencent.kuikly.compose.material3.Text
 import com.tencent.kuikly.compose.material3.TextField
 import com.tencent.kuikly.compose.material3.TextFieldDefaults
@@ -49,11 +54,15 @@ import com.tencent.kuikly.compose.ui.unit.Dp
 import com.tencent.kuikly.compose.ui.unit.dp
 import com.tencent.kuikly.compose.ui.unit.sp
 import com.tencent.kuikly.core.annotations.Page
+import com.tencent.kuikly.core.base.ColorStop
+import com.tencent.kuikly.core.base.Direction
+import com.tencent.kuikly.core.base.Translate
 import com.tencent.kuikly.core.base.attr.ImageUri
 import com.tencent.kuikly.core.coroutines.GlobalScope
 import com.tencent.kuikly.core.coroutines.launch
 import com.tencent.kuikly.core.module.RouterModule
 import com.tencent.kuikly.core.nvi.serialization.json.JSONObject
+import com.tencent.kuikly.core.timer.setTimeout
 import com.tencent.kuiklybase.markdown.compose.Markdown
 import com.tencent.kuiklybase.markdown.model.rememberMarkdownState
 import kotlinx.coroutines.delay
@@ -76,21 +85,41 @@ internal class ChatDemo : ComposeContainer() {
     internal fun ChatScreen() {
         var inputText by remember { mutableStateOf("") }
         val chatList = remember { mutableStateListOf<String>() }
+        
+        // 键盘高度状态 - 用于实现输入框跟随键盘附着
         var keyboardHeight by remember { mutableStateOf(0f) }
+        
+        // 底部安全区高度（用于键盘弹出时的偏移计算）
+        val bottomSafeArea = pagerData.safeAreaInsets.bottom
 
         // 聊天列表滚动状态
         val listState = rememberLazyListState()
+        
+        // 使用通用底部输入栏组件状态
+        val bottomBarState = rememberChatBottomBarState()
+        
+        // 同步输入文本状态
+        LaunchedEffect(inputText) {
+            if (bottomBarState.inputText.value != inputText) {
+                bottomBarState.setInputText(inputText)
+            }
+        }
+        LaunchedEffect(bottomBarState.inputText.value) {
+            if (inputText != bottomBarState.inputText.value) {
+                inputText = bottomBarState.inputText.value
+            }
+        }
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFFF4F4FE))
         ) {
-            // 顶部导航栏区（固定）
+            // 主内容区域 - 需要根据键盘高度调整
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopStart)
+                    .fillMaxSize()
+                    .padding(bottom = if (keyboardHeight > 0) keyboardHeight.dp else 0.dp)
             ) {
                 // 状态栏占位
                 Spacer(modifier = Modifier.height(pagerData.statusBarHeight.dp))
@@ -126,7 +155,8 @@ internal class ChatDemo : ComposeContainer() {
                             Spacer(modifier = Modifier.height(1.dp))
                         }
                     }
-                    LaunchedEffect(chatList.size) {
+                    // 键盘弹出或消息列表变化时滚动到底部
+                    LaunchedEffect(chatList.size, keyboardHeight) {
                         if (chatList.isNotEmpty()) {
                             listState.animateScrollToItem(chatList.size)
                         }
@@ -138,66 +168,41 @@ internal class ChatDemo : ComposeContainer() {
                     )
                 }
 
-                Column(
-                    modifier = Modifier
-                        .padding(bottom = keyboardHeight.dp)
-                ) {
-
-                    // 输入栏
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp)
-                            .padding(bottom = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(modifier = Modifier.weight(1f)) {
-                            TextField(
-                                value = inputText,
-                                onValueChange = { inputText = it },
-                                modifier = Modifier
-                                    .padding(end = 40.dp) // 给右侧按钮留出空间
-                                    .fillMaxWidth()
-                                    .keyboardHeightChange {
-                                        keyboardHeight = it.height
-                                    },
-                                placeholder = { Text(PLACEHOLDER) },
-                                shape = RoundedCornerShape(16.dp),
-                                colors = TextFieldDefaults.colors(
-                                    unfocusedContainerColor = Color.White,
-                                    focusedContainerColor = Color.White
-                                )
-                            )
+                // 底部输入栏 - 跟随键盘附着，使用带语音和扩展功能的配置
+                // 当键盘弹出时，不需要额外的 bottomSafeArea（键盘已覆盖安全区域）
+                // 但需要保留一定的底部间距，避免太贴近键盘
+                val keyboardBottomPadding = if (keyboardHeight > 0) 16.dp else bottomSafeArea.dp
+                ChatBottomBar(
+                    state = bottomBarState,
+                    bottomSafeArea = keyboardBottomPadding,
+                    config = fullFeatureChatBottomBarConfig(
+                        pageId = "ChatDemo",
+                        placeholder = PLACEHOLDER
+                    ),
+                    onSend = { messageToSend ->
+                        chatList.add(messageToSend)
+                        bottomBarState.startGenerating()
+                        GlobalScope.launch {
+                            chatList.add("")
+                            markdown.forEachIndexed { index, _ ->
+                                delay(16)
+                                chatList[chatList.lastIndex] =
+                                    markdown.substring(0, index + 1)
+                            }
+                            bottomBarState.stopGenerating()
                         }
-
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        @OptIn(InternalResourceApi::class)
-                        val sendDrawable =
-                            DrawableResource(ImageUri.pageAssets(SEND_ICON).toUrl("ChatDemo"))
-
-                        Image(
-                            painter = painterResource(sendDrawable),
-                            contentDescription = "Send",
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clickable(enabled = inputText.isNotBlank()) {
-                                    val messageToSend = inputText
-                                    inputText = ""
-                                    chatList.add(messageToSend)
-                                    GlobalScope.launch {
-                                        chatList.add("")
-                                        markdown.forEachIndexed { index, _ ->
-                                            delay(16)
-                                            chatList[chatList.lastIndex] =
-                                                markdown.substring(0, index + 1)
-                                        }
-                                    }
-                                }
-                        )
+                    },
+                    onStop = {
+                        // 停止生成
+                    },
+                    onExtensionClick = {
+                        // 扩展面板点击
+                    },
+                    onKeyboardHeightChange = { params ->
+                        // 更新键盘高度，实现输入框跟随键盘附着
+                        keyboardHeight = params.height
                     }
-                }
+                )
             }
         }
     }
@@ -466,9 +471,11 @@ internal class ChatDemo : ComposeContainer() {
     companion object {
         private const val BACK_ICON = "ic_back.png"
         private const val SEND_ICON = "ic_send.png"
+        private const val EXT_ICON = "ic_add.png"
+        private const val STOP_ICON = "ic_stop.png"
         private const val LOGO_ICON = "kuikly_logo.png"
 
-        private const val PLACEHOLDER = "Type something..."
+        private const val PLACEHOLDER = "说点什么..."
         private val markdown = """
             # 一级标题
             ## 二级标题
