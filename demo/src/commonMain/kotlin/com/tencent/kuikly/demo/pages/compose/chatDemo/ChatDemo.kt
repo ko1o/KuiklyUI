@@ -96,6 +96,9 @@ internal class ChatDemo : ComposeContainer() {
         // 键盘高度状态
         var keyboardHeight by remember { mutableStateOf(0f) }
         
+        // 扩展面板高度状态 - 参考 QQAIBiz: extBottomHeight
+        var extPanelHeight by remember { mutableStateOf(0f) }
+        
         // 键盘动画时长（毫秒）
         var keyboardAnimDuration by remember { mutableStateOf(250) }
         
@@ -118,15 +121,26 @@ internal class ChatDemo : ComposeContainer() {
         // 内容区域高度 = 页面高度 - marginBottom（固定值，不随键盘变化）
         val contentHeight = remember { pagerData.pageViewHeight - marginBottom }
         
-        // 参考 QQAIBiz: 底部栏位移 = -keyboardHeight + offsetForNavBar（键盘弹出时向上移动）
-        // 键盘展开时，底部栏需要向上移动的距离
-        // 注意：底部栏内部有 bottomSafeArea 的空间，键盘弹出时会隐藏这部分空间
-        // 所以偏移量 = -keyboardHeight + bottomSafeArea（即 QQAIBiz 的 offsetForNavBar）
-        val bottomBarOffset = -keyboardHeight + (bottomBarDefaultHeight - bottomSafeArea)
+        // 参考 QQAIBiz: 统一计算键盘和扩展面板的偏移
+        // offsetForKeyboard = -keyboardHeight + offsetForNavBar（键盘弹出时）
+        // offsetForExtBottom = -extBottomHeight + offsetForNavBar（扩展面板弹出时）
+        val offsetForKeyboard = if (keyboardHeight > 0f) {
+            -keyboardHeight + (bottomBarDefaultHeight - bottomSafeArea)
+        } else {
+            0f
+        }
         
-        // 列表需要额外避让的高度（键盘弹出时列表底部需要留出空间）
+        // 底部栏总偏移 = 仅键盘偏移（扩展面板已在 ChatBottomBar 内部撑高底部栏，无需额外偏移）
+        val bottomBarOffset = offsetForKeyboard
+        
+        // 列表需要额外避让的高度
+        // 注意：这是列表底部需要增加的 padding，用于避让键盘或扩展面板
         val listBottomPadding = if (keyboardHeight > 0f) {
-            keyboardHeight - bottomSafeArea
+            // 键盘弹出时：列表需要避让完整的键盘高度
+            keyboardHeight
+        } else if (extPanelHeight > 0f) {
+            // 扩展面板显示时：列表需要避让扩展面板高度
+            extPanelHeight
         } else {
             0f
         }
@@ -178,9 +192,21 @@ internal class ChatDemo : ComposeContainer() {
             }
         }
         
-        // 切换到语音模式时重置键盘高度
-        LaunchedEffect(bottomBarState.isVoiceMode.value) {
-            if (bottomBarState.isVoiceMode.value) {
+        // 监听扩展面板状态变化，同步更新扩展面板高度
+        // 互斥关系：扩展面板/键盘互斥（语音/文本互斥由底部栏内部处理）
+        LaunchedEffect(bottomBarState.showExtensionPanel.value) {
+            if (bottomBarState.showExtensionPanel.value) {
+                // 扩展面板显示 - 设置扩展面板高度
+                extPanelHeight = 286f  // LAYOUT_EXT_BOTTOM_HEIGHT
+            } else {
+                // 扩展面板隐藏 - 重置高度
+                extPanelHeight = 0f
+            }
+        }
+        
+        // 语音模式变化时重置键盘高度
+        LaunchedEffect(bottomBarState.inputType.value) {
+            if (bottomBarState.inputType.value == BottomBarInputType.VOICE) {
                 keyboardHeight = 0f
             }
         }
@@ -302,6 +328,13 @@ internal class ChatDemo : ComposeContainer() {
                         // 更新键盘高度和动画时长
                         keyboardAnimDuration = params.duration.toInt()
                         keyboardHeight = params.height
+                        
+                        // 键盘弹出时，收起扩展面板（扩展面板和键盘互斥）
+                        if (params.height > 0f) {
+                            extPanelHeight = 0f
+                            // 同步更新状态（确保 ChatBottomBar 内部状态一致）
+                            bottomBarState.showExtensionPanel.value = false
+                        }
                     },
                     onVoiceRecordStart = {
                         // 开始录音 - 这里应该调用实际的录音接口

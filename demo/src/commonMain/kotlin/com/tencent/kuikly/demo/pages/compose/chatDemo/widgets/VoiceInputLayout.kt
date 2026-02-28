@@ -195,10 +195,13 @@ fun VoiceInputStyleLayout(
     // 取消阈值：上移超过此距离则进入取消状态
     val cancelThreshold = 100f
     
+    // 语音输入按钮的高度 - 与文本输入框高度一致
+    val voiceButtonHeight = 32.dp
+    
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .fillMaxHeight()
+            .height(voiceButtonHeight)  // 使用固定高度而不是 fillMaxHeight
             .onGloballyPositioned { coordinates ->
                 state.inputStyleSize = coordinates.size.toSize()
             }
