@@ -20,7 +20,6 @@ import com.tencent.kuikly.compose.foundation.layout.Box
 import com.tencent.kuikly.compose.foundation.layout.Column
 import com.tencent.kuikly.compose.foundation.layout.Row
 import com.tencent.kuikly.compose.foundation.layout.Spacer
-import com.tencent.kuikly.compose.foundation.layout.fillMaxHeight
 import com.tencent.kuikly.compose.foundation.layout.fillMaxSize
 import com.tencent.kuikly.compose.foundation.layout.fillMaxWidth
 import com.tencent.kuikly.compose.foundation.layout.height
@@ -31,16 +30,11 @@ import com.tencent.kuikly.compose.foundation.layout.width
 import com.tencent.kuikly.compose.foundation.layout.widthIn
 import com.tencent.kuikly.compose.foundation.layout.PaddingValues
 import com.tencent.kuikly.compose.foundation.lazy.LazyColumn
-import com.tencent.kuikly.compose.foundation.lazy.LazyRow
 import com.tencent.kuikly.compose.foundation.lazy.items
 import com.tencent.kuikly.compose.foundation.lazy.itemsIndexed
 import com.tencent.kuikly.compose.foundation.lazy.rememberLazyListState
-import com.tencent.kuikly.compose.foundation.shape.CircleShape
 import com.tencent.kuikly.compose.foundation.shape.RoundedCornerShape
-import com.tencent.kuikly.compose.material3.Button
 import com.tencent.kuikly.compose.material3.Text
-import com.tencent.kuikly.compose.material3.TextField
-import com.tencent.kuikly.compose.material3.TextFieldDefaults
 import com.tencent.kuikly.compose.resources.DrawableResource
 import com.tencent.kuikly.compose.resources.InternalResourceApi
 import com.tencent.kuikly.compose.resources.painterResource
@@ -58,17 +52,17 @@ import com.tencent.kuikly.compose.animation.core.animateFloatAsState
 import com.tencent.kuikly.compose.animation.core.tween
 import com.tencent.kuikly.compose.ui.platform.LocalFocusManager
 import com.tencent.kuikly.core.annotations.Page
-import com.tencent.kuikly.core.base.ColorStop
-import com.tencent.kuikly.core.base.Direction
-import com.tencent.kuikly.core.base.Translate
 import com.tencent.kuikly.core.base.attr.ImageUri
 import com.tencent.kuikly.core.coroutines.GlobalScope
 import com.tencent.kuikly.core.coroutines.launch
 import com.tencent.kuikly.core.module.RouterModule
 import com.tencent.kuikly.core.nvi.serialization.json.JSONObject
-import com.tencent.kuikly.core.timer.setTimeout
 import com.tencent.kuiklybase.markdown.compose.Markdown
 import com.tencent.kuiklybase.markdown.model.rememberMarkdownState
+import com.tencent.kuikly.core.log.KLog
+import com.tencent.kuikly.core.module.Module
+import com.tencent.kuikly.demo.pages.base.BridgeModule
+import com.tencent.kuikly.demo.pages.compose.chatDemo.modules.MediaModule
 import kotlinx.coroutines.delay
 
 internal expect object NetworkClient {
@@ -77,6 +71,23 @@ internal expect object NetworkClient {
 
 @Page("ChatDemo")
 internal class ChatDemo : ComposeContainer() {
+
+    // MediaModule 实例
+    private val mediaModule by lazy { 
+        acquireModule(MediaModule.MODULE_NAME) as? MediaModule
+    }
+    
+    // BridgeModule 实例（用于 Toast 等）
+    private val bridgeModule by lazy {
+        acquireModule(BridgeModule.MODULE_NAME) as? BridgeModule
+    }
+
+    override fun createExternalModules(): Map<String, Module>? {
+        val modules = super.createExternalModules() as? HashMap ?: hashMapOf()
+        modules[MediaModule.MODULE_NAME] = MediaModule()
+        modules[BridgeModule.MODULE_NAME] = BridgeModule()
+        return modules
+    }
 
     override fun willInit() {
         super.willInit()
@@ -133,14 +144,26 @@ internal class ChatDemo : ComposeContainer() {
         // 底部栏总偏移 = 仅键盘偏移（扩展面板已在 ChatBottomBar 内部撑高底部栏，无需额外偏移）
         val bottomBarOffset = offsetForKeyboard
         
+        // 图片选择区域高度（117dp，只在有选中图片时显示）
+        val imagePickerHeight = 117f
+        
+        // 使用通用底部输入栏组件状态 - 提前定义以便在列表 padding 计算时使用
+        val bottomBarState = rememberChatBottomBarState()
+        
+        // 语音输入状态
+        val voiceInputState = rememberVoiceInputState()
+        
         // 列表需要额外避让的高度
-        // 注意：这是列表底部需要增加的 padding，用于避让键盘或扩展面板
+        // 注意：这是列表底部需要增加的 padding，用于避让键盘或扩展面板或图片选择区域
         val listBottomPadding = if (keyboardHeight > 0f) {
-            // 键盘弹出时：列表需要避让完整的键盘高度
-            keyboardHeight
+            // 键盘弹出时：列表需要避让完整的键盘高度 + 图片选择区域
+            keyboardHeight + if (bottomBarState.hasPickedImages) imagePickerHeight else 0f
         } else if (extPanelHeight > 0f) {
-            // 扩展面板显示时：列表需要避让扩展面板高度
-            extPanelHeight
+            // 扩展面板显示时：列表需要避让扩展面板高度 + 图片选择区域
+            extPanelHeight + if (bottomBarState.hasPickedImages) imagePickerHeight else 0f
+        } else if (bottomBarState.hasPickedImages) {
+            // 仅有图片选择区域时
+            imagePickerHeight
         } else {
             0f
         }
@@ -173,12 +196,6 @@ internal class ChatDemo : ComposeContainer() {
                 isProgrammaticScroll = false
             }
         }
-        
-        // 使用通用底部输入栏组件状态
-        val bottomBarState = rememberChatBottomBarState()
-        
-        // 语音输入状态
-        val voiceInputState = rememberVoiceInputState()
         
         // 同步输入文本状态
         LaunchedEffect(inputText) {
@@ -323,6 +340,72 @@ internal class ChatDemo : ComposeContainer() {
                     },
                     onExtensionClick = {
                         // 扩展面板点击
+                    },
+                    onExtensionPanelItemClick = { itemType ->
+                        // 扩展面板项点击回调
+                        when (itemType) {
+                            ExtensionPanelItemType.PHOTO -> {
+                                // 打开相册选图 - 使用模拟数据
+                                KLog.i("ChatDemo", "点击照片按钮，打开相册")
+                                
+                                // 计算还可以选择的图片数量
+                                val currentCount = bottomBarState.imagePickerState.imageCount
+                                val maxCount = MAX_IMAGE_PICK_COUNT - currentCount
+                                
+                                if (maxCount <= 0) {
+                                    bridgeModule?.toast("最多添加${MAX_IMAGE_PICK_COUNT}张照片")
+                                    return@ChatBottomBar
+                                }
+                                
+                                // 模拟选择 1-3 张图片
+                                val selectCount = minOf(maxCount, (1..3).random())
+                                val mockImages = TestImageResources.getMockSelectedImages(selectCount)
+                                
+                                // 添加到图片选择状态
+                                bottomBarState.imagePickerState.addImages(mockImages)
+                                KLog.i("ChatDemo", "模拟选图成功，添加 ${mockImages.size} 张图片")
+                                
+                                // 关闭扩展面板
+                                bottomBarState.showExtensionPanel.value = false
+                            }
+                            ExtensionPanelItemType.CAMERA -> {
+                                // 打开相机拍照 - 使用模拟数据
+                                KLog.i("ChatDemo", "点击拍摄按钮，打开相机")
+                                
+                                // 检查是否可以继续添加图片
+                                val currentCount = bottomBarState.imagePickerState.imageCount
+                                if (currentCount >= MAX_IMAGE_PICK_COUNT) {
+                                    bridgeModule?.toast("最多添加${MAX_IMAGE_PICK_COUNT}张照片")
+                                    return@ChatBottomBar
+                                }
+                                
+                                // 模拟拍摄 1 张图片（使用本地 assets 图片）
+                                val mockImage = LocalMediaInfo(
+                                    path = ImageUri.commonAssets("panda.png").toUrl(""),
+                                    width = 200,
+                                    height = 200,
+                                    fileSize = 1024 * 100,
+                                    mimeType = "image/png"
+                                )
+                                
+                                // 添加到图片选择状态
+                                bottomBarState.imagePickerState.addImage(mockImage)
+                                KLog.i("ChatDemo", "模拟拍照成功")
+                                
+                                // 关闭扩展面板
+                                bottomBarState.showExtensionPanel.value = false
+                            }
+                            ExtensionPanelItemType.FILE -> {
+                                // 打开文件选择 - 功能未实现
+                                KLog.i("ChatDemo", "点击文件按钮")
+                                bridgeModule?.toast("功能未实现")
+                            }
+                            ExtensionPanelItemType.DOCUMENT -> {
+                                // 打开文档选择 - 功能未实现
+                                KLog.i("ChatDemo", "点击文档按钮")
+                                bridgeModule?.toast("功能未实现")
+                            }
+                        }
                     },
                     onKeyboardHeightChange = { params ->
                         // 更新键盘高度和动画时长

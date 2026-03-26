@@ -111,6 +111,13 @@ class ChatBottomBarState(
     // 语音按钮是否启用
     val voiceIconEnabled: MutableState<Boolean> = mutableStateOf(true)
     
+    // 图片选择状态
+    val imagePickerState: ImagePickerState = ImagePickerState()
+    
+    // 是否有已选图片
+    val hasPickedImages: Boolean
+        get() = imagePickerState.hasImages
+    
     // ==================== 兼容旧代码的 inputMode ====================
     
     // inputMode 现在是一个派生属性，根据 inputType 和 showExtensionPanel 计算
@@ -289,6 +296,7 @@ fun ChatBottomBar(
     onExtensionClick: () -> Unit = {},
     onExpandClick: () -> Unit = {},
     onKeyboardHeightChange: (KeyboardParams) -> Unit = {},
+    onExtensionPanelItemClick: (ExtensionPanelItemType) -> Unit = {},
     modifier: Modifier = Modifier,
     voiceInputState: VoiceInputState? = null,
     onVoiceRecordStart: () -> Unit = {},
@@ -353,6 +361,18 @@ fun ChatBottomBar(
                 )
                 .clickable { /* 拦截点击事件 */ }
         ) {
+            // 图片选择预览区域 - 显示在输入框上方（holding态）
+            if (state.hasPickedImages) {
+                ImagePickerView(
+                    state = state.imagePickerState,
+                    onAddClick = {
+                        // 点击添加按钮 - 触发照片选择
+                        onExtensionPanelItemClick(ExtensionPanelItemType.PHOTO)
+                    },
+                    isDarkMode = config.isDarkMode
+                )
+            }
+            
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -499,8 +519,8 @@ fun ChatBottomBar(
                     ExtensionPanel(
                         config = defaultExtensionPanelConfig(config.isDarkMode),
                         onItemClick = { itemType ->
-                            // 面板项点击回调 - 具体逻辑由外部实现
-                            // 这里仅关闭面板
+                            // 面板项点击回调 - 传递给外部处理
+                            onExtensionPanelItemClick(itemType)
                         }
                     )
                 }
