@@ -311,6 +311,19 @@ internal class ChatDemo : ComposeContainer() {
                             contentPadding = PaddingValues(bottom = animatedListPadding.dp)
                         )
                     }
+                    
+                    // 半浮层遮罩 - 参考 QQAIBiz CapsuleMask: FADE_IN_OUT 100ms
+                    // 点击遮罩关闭半浮层
+                    androidx.compose.runtime.key(halfViewState.isVisible) {
+                        if (halfViewState.isVisible) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color(0x33000000))  // 半透明黑色遮罩
+                                    .clickable { halfViewState.hide() }
+                            )
+                        }
+                    }
                 }
                 
                 // 胶囊栏 - 半浮层显示时隐藏胶囊栏（参考 QQAIBiz CapsuleBar show 逻辑）

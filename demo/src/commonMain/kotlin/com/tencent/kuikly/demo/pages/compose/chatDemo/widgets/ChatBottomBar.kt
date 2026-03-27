@@ -351,14 +351,12 @@ fun ChatBottomBar(
     // 外层容器 - 使用 Box 叠加录音视图
     Box(modifier = modifier) {
         // 底部输入栏 - 安全距离在背景内部
+        // 注意：不使用圆角背景，因为半浮层显示时会覆盖顶部区域
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(
-                    config.backgroundColor,
-                    RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-                )
+                .background(config.backgroundColor)
                 .clickable { /* 拦截点击事件 */ }
         ) {
             // 图片选择预览区域 - 显示在输入框上方（holding态）
