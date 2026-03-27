@@ -9,15 +9,12 @@ import com.tencent.kuikly.compose.foundation.background
 import com.tencent.kuikly.compose.foundation.clickable
 import com.tencent.kuikly.compose.foundation.layout.Arrangement
 import com.tencent.kuikly.compose.foundation.layout.Box
-import com.tencent.kuikly.compose.foundation.layout.Column
 import com.tencent.kuikly.compose.foundation.layout.PaddingValues
-import com.tencent.kuikly.compose.foundation.layout.Spacer
 import com.tencent.kuikly.compose.foundation.layout.defaultMinSize
 import com.tencent.kuikly.compose.foundation.layout.fillMaxWidth
 import com.tencent.kuikly.compose.foundation.layout.height
 import com.tencent.kuikly.compose.foundation.layout.padding
 import com.tencent.kuikly.compose.foundation.layout.size
-import com.tencent.kuikly.compose.foundation.layout.width
 import com.tencent.kuikly.compose.foundation.lazy.LazyRow
 import com.tencent.kuikly.compose.foundation.lazy.itemsIndexed
 import com.tencent.kuikly.compose.foundation.shape.RoundedCornerShape
@@ -91,7 +88,10 @@ fun ChatCapsuleBar(
 }
 
 /**
- * 单个胶囊项组件 - 参考目标截图：图标居中在上，文字居中在下
+ * 单个胶囊项组件 - 严格参考 QQAIBiz ChatCapsuleItem
+ * 布局: Box(borderRadius=12, border=0.5, height=72, minWidth=77)
+ *   - Image(icon, 24x24, margin start=18 top=12)
+ *   - Text(name, align=BottomStart, padding start=18 end=18, fontSize=14, W400)
  */
 @OptIn(InternalResourceApi::class)
 @Composable
@@ -103,7 +103,8 @@ private fun ChatCapsuleItem(
 ) {
     val shape = RoundedCornerShape(config.borderRadius)
 
-    Column(
+    // 参考 QQAIBiz: Box 布局, 图标左上角, 文字左下角
+    Box(
         modifier = Modifier
             .defaultMinSize(minWidth = config.itemMinWidth)
             .height(config.itemHeight)
@@ -116,27 +117,27 @@ private fun ChatCapsuleItem(
             .background(config.itemBackgroundColor, shape)
             .alpha(if (item.enabled) 1f else 0.6f)
             .clickable(enabled = item.enabled) { onClick() }
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
     ) {
-        // 图标 - 居中显示
+        // 图标 - 参考 QQAIBiz: Image(src=icon, 24x24, margin start=18 top=12)
         val drawable = DrawableResource(item.icon)
         Image(
             painter = painterResource(drawable),
             contentDescription = item.name,
-            modifier = Modifier.size(config.iconSize)
+            modifier = Modifier
+                .padding(start = 18.dp, top = 12.dp)
+                .size(24.dp)
         )
 
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // 文字标签 - 居中显示
+        // 文字标签 - 参考 QQAIBiz: align=BottomStart, padding(start=18, end=18), fontSize=14, W400
         Text(
             text = item.name,
-            fontSize = 12.sp,
+            fontSize = 14.sp,
             fontWeight = FontWeight.W400,
             color = config.itemTextColor,
-            maxLines = 1
+            maxLines = 1,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 18.dp, end = 18.dp, bottom = 12.dp)
         )
     }
 }

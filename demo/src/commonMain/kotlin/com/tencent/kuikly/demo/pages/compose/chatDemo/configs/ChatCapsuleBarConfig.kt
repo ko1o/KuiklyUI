@@ -147,38 +147,46 @@ fun defaultCapsuleBarConfig(
 }
 
 /**
- * 默认胶囊项列表 - 参考图片中的 AI生图、照片动起来、AI写作、录音纪要、拍照搜题
+ * 默认胶囊项列表 - 使用真实 PB 数据
+ * 数据来源: capsule_bar_data.json (从 QQAIBiz 导出)
+ * 图标使用真实 CDN URL
  */
 fun defaultCapsuleItems(): List<CapsuleItemConfig> {
     return listOf(
         CapsuleItemConfig(
-            id = "ai_draw",
-            name = "AI生图",
-            icon = CapsuleCDN.AI_DRAW,
-            type = CapsuleItemType.CUSTOM
-        ),
-        CapsuleItemConfig(
-            id = "ai_video",
-            name = "照片动起来",
-            icon = CapsuleCDN.AI_VIDEO,
-            type = CapsuleItemType.CUSTOM
-        ),
-        CapsuleItemConfig(
-            id = "ai_write",
+            id = "14",
             name = "AI写作",
-            icon = CapsuleCDN.AI_WRITE,
+            icon = "https://bot-resource-1251316161.file.myqcloud.com/media/write.png",
             type = CapsuleItemType.CUSTOM
         ),
         CapsuleItemConfig(
-            id = "record_minutes",
+            id = "13",
+            name = "AI生图",
+            icon = "https://bot-resource-1251316161.file.myqcloud.com/media/draw.png",
+            type = CapsuleItemType.CUSTOM
+        ),
+        CapsuleItemConfig(
+            id = "45",
+            name = "照片动起来",
+            icon = "https://bot-resource-1251316161.file.myqcloud.com/media/video.png",
+            type = CapsuleItemType.CUSTOM
+        ),
+        CapsuleItemConfig(
+            id = "24",
             name = "录音纪要",
-            icon = CapsuleCDN.RECORD_MINUTES,
+            icon = "https://bot-resource-1251316161.file.myqcloud.com/media/xiaoq_luyin2.png",
             type = CapsuleItemType.CUSTOM
         ),
         CapsuleItemConfig(
-            id = "camera_search",
-            name = "拍照搜题",
-            icon = CapsuleCDN.CAMERA_SEARCH,
+            id = "34",
+            name = "拍照答疑",
+            icon = "https://bot-resource-1251316161.file.myqcloud.com/media/xiaoq_camera.png",
+            type = CapsuleItemType.CUSTOM
+        ),
+        CapsuleItemConfig(
+            id = "17",
+            name = "AI翻译",
+            icon = "https://bot-resource-1251316161.file.myqcloud.com/media/translate.png",
             type = CapsuleItemType.CUSTOM
         )
     )

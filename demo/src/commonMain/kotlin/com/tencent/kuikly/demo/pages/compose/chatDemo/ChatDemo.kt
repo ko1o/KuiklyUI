@@ -153,6 +153,13 @@ internal class ChatDemo : ComposeContainer() {
         // 胶囊栏高度
         val capsuleBarHeight = if (capsuleBarConfig.items.isNotEmpty()) CAPSULE_BAR_DEFAULT_HEIGHT.value else 0f
         
+        // 半浮层状态（各胶囊项共用）
+        val halfViewState = rememberCapsuleHalfViewState()
+        
+        // 预创建的半浮层配置（按需加载）
+        val aiWriteHalfViewConfig = remember { createAIWriteHalfViewConfig() }
+        val aiDrawHalfViewConfig = remember { createAIDrawHalfViewConfig() }
+        
         // 使用通用底部输入栏组件状态 - 提前定义以便在列表 padding 计算时使用
         val bottomBarState = rememberChatBottomBarState()
         
@@ -306,17 +313,40 @@ internal class ChatDemo : ComposeContainer() {
                     }
                 }
                 
-                // 胶囊栏 - 背景透明但占用布局空间（不悬浮）
-                ChatCapsuleBar(
-                    config = capsuleBarConfig,
-                    onItemClick = { index, item ->
-                        KLog.i("ChatDemo", "胶囊点击: index=$index, name=${item.name}, id=${item.id}")
-                        bridgeModule?.toast("点击了: ${item.name}")
+                // 胶囊栏 - 半浮层显示时隐藏胶囊栏（参考 QQAIBiz CapsuleBar show 逻辑）
+                if (!halfViewState.isVisible) {
+                    ChatCapsuleBar(
+                        config = capsuleBarConfig,
+                        onItemClick = { index, item ->
+                            KLog.i("ChatDemo", "胶囊点击: index=$index, name=${item.name}, id=${item.id}")
+                            
+                            // 根据胶囊 buttonId 显示对应的半浮层（ID 来自真实 PB 数据）
+                            when (item.id) {
+                                "14" -> {  // buttonId=14: AI写作 (optId=4)
+                                    halfViewState.show(aiWriteHalfViewConfig)
+                                }
+                                "13" -> {  // buttonId=13: AI生图 (optId=3)
+                                    halfViewState.show(aiDrawHalfViewConfig)
+                                }
+                                else -> {
+                                    bridgeModule?.toast("点击了: ${item.name}")
+                                }
+                            }
+                        }
+                    )
+                    
+                    // 胶囊栏与底部输入框的间距
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+                
+                // 半浮层 - 带动画切换（参考 QQAIBiz CapsuleFloating 从底部滑入）
+                AnimatedCapsuleHalfView(
+                    config = halfViewState.currentConfig.value,
+                    onClose = { halfViewState.hide() },
+                    onPlaceholderChange = { placeholder ->
+                        KLog.i("ChatDemo", "半浮层占位符更新: $placeholder")
                     }
                 )
-                
-                // 胶囊栏与底部输入框的间距
-                Spacer(modifier = Modifier.height(12.dp))
             }
 
             // 底部输入栏容器 - 参考 QQAIBiz: AppBottom 使用全屏高度容器 + transform 偏移
