@@ -147,6 +147,12 @@ internal class ChatDemo : ComposeContainer() {
         // 图片选择区域高度（117dp，只在有选中图片时显示）
         val imagePickerHeight = 117f
         
+        // 胶囊栏配置
+        val capsuleBarConfig = remember { defaultCapsuleBarConfig() }
+        
+        // 胶囊栏高度
+        val capsuleBarHeight = if (capsuleBarConfig.items.isNotEmpty()) CAPSULE_BAR_DEFAULT_HEIGHT.value else 0f
+        
         // 使用通用底部输入栏组件状态 - 提前定义以便在列表 padding 计算时使用
         val bottomBarState = rememberChatBottomBarState()
         
@@ -299,6 +305,18 @@ internal class ChatDemo : ComposeContainer() {
                         )
                     }
                 }
+                
+                // 胶囊栏 - 背景透明但占用布局空间（不悬浮）
+                ChatCapsuleBar(
+                    config = capsuleBarConfig,
+                    onItemClick = { index, item ->
+                        KLog.i("ChatDemo", "胶囊点击: index=$index, name=${item.name}, id=${item.id}")
+                        bridgeModule?.toast("点击了: ${item.name}")
+                    }
+                )
+                
+                // 胶囊栏与底部输入框的间距
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
             // 底部输入栏容器 - 参考 QQAIBiz: AppBottom 使用全屏高度容器 + transform 偏移
@@ -312,7 +330,7 @@ internal class ChatDemo : ComposeContainer() {
                 // 占位空间：页面高度 - 底部栏高度 - 底部安全区
                 Spacer(modifier = Modifier.weight(1f))
                 
-                // 底部输入栏
+                // 底部输入栏（胶囊栏已移到消息列表区域内悬浮显示）
                 ChatBottomBar(
                     state = bottomBarState,
                     bottomSafeArea = bottomSafeArea.dp,
