@@ -24,26 +24,9 @@ import com.tencent.kuikly.compose.ui.Modifier
 import com.tencent.kuikly.compose.ui.graphics.Color
 import com.tencent.kuikly.compose.ui.unit.Dp
 import com.tencent.kuikly.compose.ui.unit.dp
-import com.tencent.kuikly.compose.ui.unit.sp
+import com.tencent.kuikly.demo.pages.compose.chatDemo.configs.*
 
-// ==================== 常量定义（参考 QQAIBiz ExtBottomBar） ====================
-
-/** 扩展面板高度 - 参考 QQAIBiz layoutExtBottomHeight = 286f.dp */
-val LAYOUT_EXT_BOTTOM_HEIGHT = 286f.dp
-
-/** 扩展面板列间距 - 参考 QQAIBiz layoutExtSpacing = 16.dp */
-val LAYOUT_EXT_SPACING = 16.dp
-
-/** 扩展面板列数 - 参考 QQAIBiz layoutExtColumns = 4 */
-const val LAYOUT_EXT_COLUMNS = 4
-
-/** 图标大小 - 参考 QQAIBiz 36f.dp */
-val EXTENSION_ICON_SIZE = 36.dp
-
-/** 图标与文字间距 - 参考 QQAIBiz 9f.dp */
-val EXTENSION_ICON_TEXT_SPACING = 9.dp
-
-// ==================== CDN 图片链接（来自 QQAIBiz BabyQIconConstant） ====================
+// ==================== CDN 图片链接（资源数据，保留在 widget 中） ====================
 
 /**
  * 扩展面板图标配置 - base64格式，与 QQAIBiz 保持一致
@@ -71,68 +54,6 @@ object ExtensionPanelIcons {
     fun camera(isDark: Boolean = false) = if (isDark) CAMERA_NIGHT else CAMERA_DAY
 }
 
-// ==================== 数据模型 ====================
-
-/**
- * 扩展面板按钮类型
- */
-enum class ExtensionPanelItemType {
-    PHOTO,      // 照片
-    CAMERA,     // 拍摄
-    FILE,       // 文件
-    DOCUMENT    // 文档
-}
-
-/**
- * 扩展面板按钮配置
- */
-data class ExtensionPanelItem(
-    val type: ExtensionPanelItemType,
-    val title: String,
-    val iconUrl: String,
-    val enabled: Boolean = true
-)
-
-/**
- * 扩展面板配置
- */
-data class ExtensionPanelConfig(
-    val items: List<ExtensionPanelItem> = defaultExtensionPanelItems(),
-    val backgroundColor: Color = Color.White,
-    val dividerColor: Color = Color(0xFFE5E5E5),
-    val textColor: Color = Color(0xFF333333),
-    val textDisabledColor: Color = Color(0xFF999999),
-    val isDarkMode: Boolean = false
-)
-
-/**
- * 默认扩展面板项列表
- */
-fun defaultExtensionPanelItems(isDarkMode: Boolean = false): List<ExtensionPanelItem> {
-    return listOf(
-        ExtensionPanelItem(
-            type = ExtensionPanelItemType.PHOTO,
-            title = "照片",
-            iconUrl = ExtensionPanelIcons.photo(isDarkMode)
-        ),
-        ExtensionPanelItem(
-            type = ExtensionPanelItemType.CAMERA,
-            title = "拍摄",
-            iconUrl = ExtensionPanelIcons.camera(isDarkMode)
-        ),
-        ExtensionPanelItem(
-            type = ExtensionPanelItemType.FILE,
-            title = "文件",
-            iconUrl = ExtensionPanelIcons.FILE
-        ),
-        ExtensionPanelItem(
-            type = ExtensionPanelItemType.DOCUMENT,
-            title = "文档",
-            iconUrl = ExtensionPanelIcons.DOCUMENT
-        )
-    )
-}
-
 // ==================== 组件实现 ====================
 
 /**
@@ -150,19 +71,25 @@ fun ExtensionPanel(
     onItemClick: (ExtensionPanelItemType) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    // 如果有整体 builder，直接调用 builder 渲染
+    if (config.builder != null) {
+        config.builder.invoke(config, onItemClick)
+        return
+    }
+    
     // 计算每项宽度 - 参考 QQAIBiz: (appWidth - spacing * (columns + 1)) / columns
-    val itemWidth = (appWidth - LAYOUT_EXT_SPACING.value * (LAYOUT_EXT_COLUMNS + 1)) / LAYOUT_EXT_COLUMNS
+    val itemWidth = (appWidth - config.contentPadding.value * (config.columns + 1)) / config.columns
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .height(LAYOUT_EXT_BOTTOM_HEIGHT)
+            .height(config.panelHeight)
             .background(config.backgroundColor)
     ) {
         // 顶部分割线 - 参考 QQAIBiz
         Box(
             modifier = Modifier
-                .height(0.5.dp)
+                .height(config.dividerHeight)
                 .fillMaxWidth()
                 .background(config.dividerColor)
         )
@@ -172,17 +99,21 @@ fun ExtensionPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .wrapContentHeight()
-                .padding(LAYOUT_EXT_SPACING),
+                .padding(config.contentPadding),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             config.items.forEach { item ->
-                ExtensionPanelItemView(
-                    item = item,
-                    itemWidth = itemWidth.dp,
-                    config = config,
-                    onClick = { onItemClick(item.type) }
-                )
+                if (config.itemBuilder != null) {
+                    config.itemBuilder.invoke(item, config, { onItemClick(item.type) })
+                } else {
+                    ExtensionPanelItemView(
+                        item = item,
+                        itemWidth = itemWidth.dp,
+                        config = config,
+                        onClick = { onItemClick(item.type) }
+                    )
+                }
             }
         }
     }
@@ -204,7 +135,7 @@ private fun ExtensionPanelItemView(
     Column(
         modifier = Modifier
             .width(itemWidth)
-            .padding(vertical = 32.dp)  // 参考 QQAIBiz: padding(0.dp, 32f.dp, 0.dp, 32f.dp)
+            .padding(vertical = config.itemVerticalPadding)
             .clickable(enabled = item.enabled) { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -213,18 +144,30 @@ private fun ExtensionPanelItemView(
         Image(
             painter = painterResource(drawable),
             contentDescription = item.title,
-            modifier = Modifier.size(EXTENSION_ICON_SIZE)
+            modifier = Modifier.size(config.iconSize)
         )
         
-        Spacer(modifier = Modifier.height(EXTENSION_ICON_TEXT_SPACING))
+        Spacer(modifier = Modifier.height(config.iconTextSpacing))
         
-        // 文字标签 - 参考 QQAIBiz: fontSize = 12f.dp
+        // 文字标签
         Text(
             text = item.title,
-            fontSize = 12.sp,
+            fontSize = config.textFontSize,
             color = textColor
         )
     }
+}
+
+/**
+ * 默认扩展面板项列表
+ */
+fun defaultExtensionPanelItems(isDarkMode: Boolean = false): List<ExtensionPanelItem> {
+    return listOf(
+        ExtensionPanelItem(type = ExtensionPanelItemType.PHOTO, title = "照片", iconUrl = ExtensionPanelIcons.photo(isDarkMode)),
+        ExtensionPanelItem(type = ExtensionPanelItemType.CAMERA, title = "拍摄", iconUrl = ExtensionPanelIcons.camera(isDarkMode)),
+        ExtensionPanelItem(type = ExtensionPanelItemType.FILE, title = "文件", iconUrl = ExtensionPanelIcons.FILE),
+        ExtensionPanelItem(type = ExtensionPanelItemType.DOCUMENT, title = "文档", iconUrl = ExtensionPanelIcons.DOCUMENT)
+    )
 }
 
 /**

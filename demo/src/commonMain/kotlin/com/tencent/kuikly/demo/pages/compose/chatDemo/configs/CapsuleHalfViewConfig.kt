@@ -1,10 +1,13 @@
 package com.tencent.kuikly.demo.pages.compose.chatDemo.configs
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import com.tencent.kuikly.compose.ui.graphics.Color
 import com.tencent.kuikly.compose.ui.unit.Dp
+import com.tencent.kuikly.compose.ui.unit.TextUnit
 import com.tencent.kuikly.compose.ui.unit.dp
+import com.tencent.kuikly.compose.ui.unit.sp
 
 // ==================== 半浮层常量定义（参考 QQAIBiz QueryHalfWriteView） ====================
 
@@ -22,6 +25,204 @@ val HALF_VIEW_TITLE_HEIGHT = 60.dp
 
 /** 风格/比例卡片高度 - 参考 QQAIBiz layoutStyleItemHeight = 80.dp */
 val STYLE_CARD_HEIGHT = 80.dp
+
+// ==================== 半浮层 UI 样式配置 ====================
+
+/**
+ * 半浮层 UI 样式配置
+ * 
+ * 将所有与 UI 相关的颜色、字体大小、间距、文本等抽象到此配置中，
+ * 其他工程复用时只需修改此配置即可自定义样式。
+ * 
+ * 支持 builder 属性：如果 builder 有值，直接调用 builder 来实现 UI 内容。
+ */
+data class CapsuleHalfViewUIConfig(
+    // ==================== 布局 ====================
+    /** 类型按钮高度 */
+    val typeButtonHeight: Dp = HALF_VIEW_TYPE_BUTTON_HEIGHT,
+    /** 圆角 */
+    val cornerRadius: Dp = HALF_VIEW_CORNER_RADIUS,
+    /** 水平内边距 */
+    val horizontalPadding: Dp = HALF_VIEW_HORIZONTAL_PADDING,
+    /** 标题栏高度 */
+    val titleHeight: Dp = HALF_VIEW_TITLE_HEIGHT,
+    /** 风格/比例卡片高度 */
+    val styleCardHeight: Dp = STYLE_CARD_HEIGHT,
+    /** 动画时长 */
+    val animDuration: Int = 250,
+    
+    // ==================== 背景色 ====================
+    /** 半浮层背景色 */
+    val backgroundColor: Color = Color.White,
+    /** 分割线颜色 */
+    val dividerColor: Color = Color(0xFFE5E5E5),
+    /** 分割线高度 */
+    val dividerHeight: Dp = 0.5.dp,
+    
+    // ==================== 标题栏 ====================
+    /** 标题字体大小 */
+    val titleFontSize: TextUnit = 16.sp,
+    /** 标题颜色 */
+    val titleColor: Color = Color(0xFF333333),
+    /** 标题图标大小 */
+    val titleIconSize: Dp = 24.dp,
+    /** 标题与图标间距 */
+    val titleIconSpacing: Dp = 4.dp,
+    /** 标题栏顶部内边距 */
+    val titleTopPadding: Dp = 24.dp,
+    /** 关闭按钮大小 */
+    val closeButtonSize: Dp = 24.dp,
+    /** 关闭按钮文本 */
+    val closeButtonText: String = "✕",
+    /** 关闭按钮字体大小 */
+    val closeButtonFontSize: TextUnit = 16.sp,
+    /** 关闭按钮颜色 */
+    val closeButtonColor: Color = Color(0xFF999999),
+    
+    // ==================== 类型区域 ====================
+    /** 类型区域标题字体大小 */
+    val typeSectionTitleFontSize: TextUnit = 12.sp,
+    /** 类型区域标题颜色 */
+    val typeSectionTitleColor: Color = Color(0xFF333333),
+    /** 类型区域标题顶部间距 */
+    val typeSectionTitleTopPadding: Dp = 12.dp,
+    /** 类型区域标题底部间距 */
+    val typeSectionTitleBottomPadding: Dp = 6.dp,
+    /** 类型按钮字体大小 */
+    val typeButtonFontSize: TextUnit = 14.sp,
+    /** 类型按钮文字颜色（未选中） */
+    val typeButtonTextColor: Color = Color(0xFF333333),
+    /** 类型按钮背景色（未选中） */
+    val typeButtonBgColor: Color = Color.Transparent,
+    /** 类型按钮边框颜色（未选中） */
+    val typeButtonBorderColor: Color = Color(0xFFE5E5E5),
+    /** 类型按钮边框宽度 */
+    val typeButtonBorderWidth: Dp = 0.5.dp,
+    /** 类型按钮文字颜色（选中） */
+    val typeButtonSelectedTextColor: Color = Color.White,
+    /** 类型按钮背景色（选中） */
+    val typeButtonSelectedBgColor: Color = Color(0xFF5B6CFF),
+    /** 类型按钮边框颜色（选中） */
+    val typeButtonSelectedBorderColor: Color = Color(0xFF5B6CFF),
+    /** 类型网格行间距 */
+    val typeGridRowSpacing: Dp = 8.dp,
+    /** 类型网格列间距 */
+    val typeGridColumnSpacing: Dp = 10.dp,
+    
+    // ==================== 要求区域 ====================
+    /** 要求区域标题字体大小 */
+    val requireSectionTitleFontSize: TextUnit = 12.sp,
+    /** 要求区域标题颜色 */
+    val requireSectionTitleColor: Color = Color(0xFF333333),
+    /** 要求区域标题顶部间距 */
+    val requireSectionTitleTopPadding: Dp = 16.dp,
+    /** 要求区域标题底部间距 */
+    val requireSectionTitleBottomPadding: Dp = 6.dp,
+    /** 要求按钮字体大小 */
+    val requireButtonFontSize: TextUnit = 14.sp,
+    /** 要求按钮文字颜色 */
+    val requireButtonTextColor: Color = Color(0xFF333333),
+    /** 要求按钮禁用文字颜色 */
+    val requireButtonDisabledTextColor: Color = Color(0xFF999999),
+    /** 要求按钮边框颜色 */
+    val requireButtonBorderColor: Color = Color(0xFFE5E5E5),
+    /** 要求按钮间距 */
+    val requireButtonSpacing: Dp = 8.dp,
+    /** 要求区域底部间距 */
+    val requireSectionBottomSpacing: Dp = 24.dp,
+    /** 箭头图标大小 */
+    val arrowIconSize: Dp = 12.dp,
+    /** 箭头与文字间距 */
+    val arrowTextSpacing: Dp = 4.dp,
+    
+    // ==================== Popover 菜单 ====================
+    /** Popover 宽度 */
+    val popoverWidth: Dp = 160.dp,
+    /** Popover 选项高度 */
+    val popoverItemHeight: Dp = 44.dp,
+    /** Popover 选项字体大小 */
+    val popoverItemFontSize: TextUnit = 16.sp,
+    /** Popover 选项文字颜色 */
+    val popoverItemTextColor: Color = Color(0xFF333333),
+    /** Popover 选项水平内边距 */
+    val popoverItemHorizontalPadding: Dp = 16.dp,
+    /** Popover 选项内边距 */
+    val popoverContentPadding: Dp = 8.dp,
+    /** Popover 选中标记大小 */
+    val popoverCheckmarkSize: Dp = 20.dp,
+    /** Popover 选中标记颜色 */
+    val popoverCheckmarkColor: Color = Color(0xFF5B6CFF),
+    
+    // ==================== AI画图专属 ====================
+    /** AI画图展开按钮圆角 */
+    val aiDrawButtonCornerRadius: Dp = 12.dp,
+    /** AI画图展开按钮背景色 */
+    val aiDrawButtonBgColor: Color = Color.White,
+    /** AI画图展开按钮边框颜色 */
+    val aiDrawButtonBorderColor: Color = Color(0xFFE5E5E5),
+    /** AI画图展开按钮字体大小 */
+    val aiDrawButtonFontSize: TextUnit = 14.sp,
+    /** AI画图展开按钮文字颜色 */
+    val aiDrawButtonTextColor: Color = Color(0xFF333333),
+    /** 风格卡片圆角 */
+    val styleCardCornerRadius: Dp = 12.dp,
+    /** 风格卡片名称字体大小 */
+    val styleCardNameFontSize: TextUnit = 12.sp,
+    /** 风格卡片名称颜色 */
+    val styleCardNameColor: Color = Color.White,
+    /** 风格卡片名称底部间距 */
+    val styleCardNameBottomPadding: Dp = 8.dp,
+    /** 风格卡片底部渐变高度 */
+    val styleCardGradientHeight: Dp = 26.dp,
+    /** 风格卡片底部渐变颜色 */
+    val styleCardGradientColor: Color = Color(0xE6000000),
+    /** 选中标记大小 */
+    val checkedIndicatorSize: Dp = 20.dp,
+    /** 选中标记背景色 */
+    val checkedIndicatorBgColor: Color = Color.Black,
+    /** 选中标记图标大小 */
+    val checkedIndicatorIconSize: Dp = 16.dp,
+    /** 选中标记偏移 X */
+    val checkedIndicatorOffsetX: Dp = (-4).dp,
+    /** 选中标记偏移 Y */
+    val checkedIndicatorOffsetY: Dp = 4.dp,
+    /** 比例卡片背景色 */
+    val ratioCardBgColor: Color = Color.White,
+    /** 比例卡片边框颜色 */
+    val ratioCardBorderColor: Color = Color(0xFFE5E5E5),
+    /** 比例卡片图标大小 */
+    val ratioCardIconSize: Dp = 28.dp,
+    /** 比例卡片图标顶部间距 */
+    val ratioCardIconTopPadding: Dp = 14.dp,
+    /** 比例卡片名称字体大小 */
+    val ratioCardNameFontSize: TextUnit = 14.sp,
+    /** 比例卡片名称颜色 */
+    val ratioCardNameColor: Color = Color(0xFF333333),
+    /** 比例卡片名称底部间距 */
+    val ratioCardNameBottomPadding: Dp = 8.dp,
+    /** AI画图内容区间距 */
+    val aiDrawContentTopSpacing: Dp = 12.dp,
+    /** AI画图按钮栏间距 */
+    val aiDrawButtonBarSpacing: Dp = 8.dp,
+    /** AI画图卡片区间距 */
+    val aiDrawCardSpacing: Dp = 8.dp,
+    /** AI画图底部间距 */
+    val aiDrawBottomSpacing: Dp = 16.dp,
+    /** AI画图卡片切换动画时长 */
+    val aiDrawFadeAnimDuration: Int = 150,
+    
+    // ==================== Builder ====================
+    /** 标题栏 builder - 如果有值，直接用 builder 渲染标题栏 */
+    val titleBarBuilder: (@Composable (title: String, titleIcon: String, onClose: () -> Unit) -> Unit)? = null,
+    /** 类型区域 builder - 如果有值，直接用 builder 渲染类型区域 */
+    val typeSectionBuilder: (@Composable (config: CapsuleHalfViewConfig, onTypeSelected: (HalfViewTypeItem) -> Unit) -> Unit)? = null,
+    /** 要求区域 builder - 如果有值，直接用 builder 渲染要求区域 */
+    val requireSectionBuilder: (@Composable (items: List<HalfViewRequireBarItem>, title: String) -> Unit)? = null,
+    /** AI画图内容 builder - 如果有值，直接用 builder 渲染AI画图 */
+    val aiDrawContentBuilder: (@Composable (config: AIDrawConfig) -> Unit)? = null,
+    /** 整体内容 builder - 如果有值，直接用 builder 渲染整个半浮层内容 */
+    val contentBuilder: (@Composable (config: CapsuleHalfViewConfig, onClose: () -> Unit, onPlaceholderChange: (String) -> Unit) -> Unit)? = null
+)
 
 // ==================== AI画图风格项数据（参考 QQAIBiz StyleItem） ====================
 
@@ -191,7 +392,9 @@ data class CapsuleHalfViewConfig(
     val showRequireSection: Boolean = true,
     val typeGridRows: Int = 2,
     /** AI 画图专属配置 - 当 id == "ai_draw" 时使用 */
-    val aiDrawConfig: AIDrawConfig? = null
+    val aiDrawConfig: AIDrawConfig? = null,
+    /** UI 样式配置 - 所有 UI 相关的颜色、字体、间距等 */
+    val uiConfig: CapsuleHalfViewUIConfig = CapsuleHalfViewUIConfig()
 ) {
     /** 是否为 AI 画图模式 */
     val isAIDrawMode: Boolean get() = aiDrawConfig != null

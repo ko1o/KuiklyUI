@@ -1,8 +1,11 @@
 package com.tencent.kuikly.demo.pages.compose.chatDemo.configs
 
+import androidx.compose.runtime.Composable
 import com.tencent.kuikly.compose.ui.graphics.Color
 import com.tencent.kuikly.compose.ui.unit.Dp
+import com.tencent.kuikly.compose.ui.unit.TextUnit
 import com.tencent.kuikly.compose.ui.unit.dp
+import com.tencent.kuikly.compose.ui.unit.sp
 
 // ==================== 常量定义（参考 QQAIBiz） ====================
 
@@ -110,6 +113,12 @@ data class ChatBottomBarConfig(
     // 文本配置
     val placeholder: String = "输入消息...",
     val maxInputLength: Int = 2000,
+    /** 输入框字体大小 */
+    val inputFontSize: TextUnit = TEXT_INPUT_FONT_SIZE.sp,
+    /** 输入框行高倍数 */
+    val inputLineHeightMultiplier: Float = TEXT_INPUT_LINE_HEIGHT_MULTIPLIER,
+    /** 占位符字体大小 */
+    val placeholderFontSize: TextUnit = TEXT_INPUT_FONT_SIZE.sp,
     
     // 按钮配置
     val voiceButton: BottomBarButtonConfig? = null,
@@ -127,7 +136,15 @@ data class ChatBottomBarConfig(
     val pageId: String = "ChatDemo",
     
     // 暗黑模式
-    val isDarkMode: Boolean = false
+    val isDarkMode: Boolean = false,
+    
+    // ==================== Builder ====================
+    /** 输入框 builder - 如果有值，直接调用 builder 来渲染输入框区域 */
+    val inputBuilder: (@Composable (text: String, onValueChange: (String) -> Unit) -> Unit)? = null,
+    /** 右侧按钮区域 builder - 如果有值，直接调用 builder 来渲染右侧按钮 */
+    val rightButtonsBuilder: (@Composable (canSend: Boolean, isGenerating: Boolean, onSend: () -> Unit, onStop: () -> Unit) -> Unit)? = null,
+    /** 整体 builder - 如果有值，直接调用 builder 来渲染整个底部栏 */
+    val builder: (@Composable (config: ChatBottomBarConfig, onSend: (String) -> Unit, onStop: () -> Unit) -> Unit)? = null
 )
 
 // ==================== 便捷构建器 ====================

@@ -29,11 +29,11 @@ import com.tencent.kuikly.compose.ui.text.font.FontWeight
 import com.tencent.kuikly.compose.ui.unit.dp
 import com.tencent.kuikly.compose.ui.unit.sp
 import com.tencent.kuikly.core.base.attr.ImageUri
+import com.tencent.kuikly.demo.pages.compose.chatDemo.configs.WelcomePromptBox
+import com.tencent.kuikly.demo.pages.compose.chatDemo.configs.WelcomeViewConfig
 
 /**
  * 欢迎页组件
- * 
- * 显示 Logo 和预设的快捷提示卡片
  */
 @OptIn(InternalResourceApi::class)
 @Composable
@@ -41,47 +41,14 @@ fun WelcomeView(
     onInputTextChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
-    contentPadding: PaddingValues = PaddingValues(0.dp)
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    config: WelcomeViewConfig = WelcomeViewConfig()
 ) {
-    // 预设的快捷提示卡片
-    val promptBoxes = listOf(
-        PromptBox(
-            title = "\uD83C\uDF93 高考志愿分析",
-            prompt = "请帮我分析高考志愿填报方案，结合我的成绩和兴趣给出建议",
-            subtitle = "高考之路，有我护航",
-            startColor = Color(0xFFCDC4BB)
-        ),
-        PromptBox(
-            title = "\u26BD 世界杯观赛助手",
-            prompt = "分析今天的世界杯战况如何",
-            subtitle = "分析比赛战况",
-            startColor = Color(0xFFFEE1D3)
-        ),
-        PromptBox(
-            title = "\u2600\uFE0F 医学健康助手",
-            prompt = "请给出健康生活建议",
-            subtitle = "专业、科学",
-            startColor = Color(0xFFF6BEBD)
-        ),
-        PromptBox(
-            title = "\uD83C\uDF89 高考送祝福",
-            prompt = "请写一段高考祝福语，祝考生金榜题名",
-            subtitle = "祝各位考生金榜题名",
-            startColor = Color(0xFFCFAAA1)
-        ),
-        PromptBox(
-            title = "\uD83D\uDCDA 学习计划助手",
-            prompt = "帮我制定一个高效的学习计划，提升学习效率",
-            subtitle = "科学规划，高效学习",
-            startColor = Color(0xFFD4E4F7)
-        ),
-        PromptBox(
-            title = "\uD83C\uDFA8 创意写作助手",
-            prompt = "帮我写一篇富有创意的短文或故事",
-            subtitle = "激发灵感，妙笔生花",
-            startColor = Color(0xFFE8D5F2)
-        )
-    )
+    // 如果有整体 builder，直接调用
+    if (config.builder != null) {
+        config.builder.invoke(onInputTextChange)
+        return
+    }
 
     LazyColumn(
         modifier = modifier,
@@ -89,99 +56,55 @@ fun WelcomeView(
         horizontalAlignment = Alignment.CenterHorizontally,
         contentPadding = contentPadding
     ) {
-        item {
-            Spacer(modifier = Modifier.height(32.dp))
-        }
+        item { Spacer(modifier = Modifier.height(config.logoTopSpacing)) }
         
         item {
-            // Logo
-            val logoDrawable = DrawableResource(ImageUri.pageAssets(LOGO_ICON).toUrl("ChatDemo"))
+            val logoDrawable = DrawableResource(ImageUri.pageAssets(config.logoIcon).toUrl(config.pageName))
             Image(
                 painter = painterResource(logoDrawable),
-                contentDescription = "Kuikly Logo",
-                modifier = Modifier
-                    .width(240.dp)
-                    .height(70.dp)
+                contentDescription = "Logo",
+                modifier = Modifier.width(config.logoWidth).height(config.logoHeight)
             )
         }
         
-        item {
-            Spacer(modifier = Modifier.height(40.dp))
-        }
+        item { Spacer(modifier = Modifier.height(config.logoBottomSpacing)) }
 
-        // 快捷提示卡片列表
-        items(promptBoxes) { box ->
-            PromptCard(
-                box = box,
-                onClick = { onInputTextChange(box.prompt) }
-            )
-            Spacer(modifier = Modifier.height(10.dp))
+        items(config.promptBoxes) { box ->
+            if (config.cardBuilder != null) {
+                config.cardBuilder.invoke(box) { onInputTextChange(box.prompt) }
+            } else {
+                PromptCard(box = box, config = config, onClick = { onInputTextChange(box.prompt) })
+            }
+            Spacer(modifier = Modifier.height(config.cardSpacing))
         }
         
-        item {
-            Spacer(modifier = Modifier.height(8.dp))
-        }
+        item { Spacer(modifier = Modifier.height(8.dp)) }
     }
 }
 
-/**
- * 快捷提示卡片
- */
 @Composable
-private fun PromptCard(
-    box: PromptBox,
-    onClick: () -> Unit
-) {
+private fun PromptCard(box: WelcomePromptBox, config: WelcomeViewConfig, onClick: () -> Unit) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = config.cardHorizontalPadding),
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .clip(RoundedCornerShape(16.dp))
+                .fillMaxWidth(config.cardWidthFraction)
+                .clip(RoundedCornerShape(config.cardCornerRadius))
                 .background(
                     com.tencent.kuikly.compose.ui.graphics.Brush.Companion.horizontalGradient(
                         colors = listOf(box.startColor, box.endColor)
                     )
                 )
                 .clickable { onClick() }
-                .padding(vertical = 16.dp, horizontal = 18.dp)
+                .padding(vertical = config.cardVerticalPadding, horizontal = config.cardInnerHorizontalPadding)
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = box.title,
-                    fontSize = 20.sp,
-                    color = Color.Black,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = box.subtitle,
-                    fontSize = 15.sp,
-                    color = Color.Black.copy(alpha = 0.9f)
-                )
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Text(text = box.title, fontSize = config.cardTitleFontSize, color = config.cardTitleColor, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(config.cardTitleSubtitleSpacing))
+                Text(text = box.subtitle, fontSize = config.cardSubtitleFontSize, color = Color.Black.copy(alpha = config.cardSubtitleAlpha))
             }
         }
     }
 }
-
-/**
- * 快捷提示数据类
- */
-data class PromptBox(
-    val title: String,
-    val prompt: String,
-    val subtitle: String = "",
-    val startColor: Color = Color.White,
-    val endColor: Color = Color.White
-)
-
-// ==================== 常量定义 ====================
-
-private const val LOGO_ICON = "kuikly_logo.png"

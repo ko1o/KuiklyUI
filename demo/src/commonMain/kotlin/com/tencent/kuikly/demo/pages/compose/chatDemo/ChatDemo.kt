@@ -47,7 +47,7 @@ internal expect object NetworkClient {
  * - modules/               # 原生模块
  */
 @Page("ChatDemo")
-internal class ChatDemo : ComposeContainer() {
+internal open class ChatDemo : ComposeContainer() {
 
     // MediaModule 实例
     private val mediaModule by lazy { 
@@ -58,6 +58,23 @@ internal class ChatDemo : ComposeContainer() {
     private val bridgeModule by lazy {
         acquireModule(BridgeModule.MODULE_NAME) as? BridgeModule
     }
+
+    /**
+     * 获取 AppUIConfig - 所有 UI 配置的总入口
+     *
+     * 子类重写此方法即可定制整个 App 的 UI 样式，支持 copy 快速改某个属性：
+     * ```kotlin
+     * override fun getAppUIConfig(): AppUIConfig {
+     *     val default = super.getAppUIConfig()
+     *     return default.copy(
+     *         app = default.app.copy(backgroundColor = Color.Black),
+     *         appTop = default.appTop.copy(titleColor = Color.White),
+     *         chatMessageItem = default.chatMessageItem.copy(userBubbleColor = Color.Blue)
+     *     )
+     * }
+     * ```
+     */
+    open fun getAppUIConfig(): AppUIConfig = AppUIConfig()
 
     override fun createExternalModules(): Map<String, Module>? {
         val modules = super.createExternalModules() as? HashMap ?: hashMapOf()
@@ -75,6 +92,9 @@ internal class ChatDemo : ComposeContainer() {
 
     @Composable
     private fun ChatScreen() {
+        // 获取 UI 配置（子类可重写 getAppUIConfig() 来定制）
+        val uiConfig = getAppUIConfig()
+        
         // 计算底部安全区高度
         val bottomSafeArea = if (pagerData.isAndroid) {
             maxOf(pagerData.androidBottomBavBarHeight, 34f)
@@ -82,17 +102,19 @@ internal class ChatDemo : ComposeContainer() {
             maxOf(pagerData.safeAreaInsets.bottom, 34f)
         }
         
-        // 创建应用状态
+        // 创建应用状态，传入 uiConfig
         val appState = rememberAppState(
             pageViewHeight = pagerData.pageViewHeight,
             pageViewWidth = pagerData.pageViewWidth,
             statusBarHeight = pagerData.statusBarHeight,
-            bottomSafeArea = bottomSafeArea
+            bottomSafeArea = bottomSafeArea,
+            uiConfig = uiConfig
         )
         
-        // 主 UI 组件
+        // 主 UI 组件，传入 uiConfig
         App(
             appState = appState,
+            uiConfig = uiConfig,
             onBack = {
                 getPager().acquireModule<RouterModule>(RouterModule.MODULE_NAME).closePage()
             },

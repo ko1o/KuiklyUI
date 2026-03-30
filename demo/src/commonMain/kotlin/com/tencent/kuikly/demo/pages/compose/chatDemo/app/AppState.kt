@@ -20,8 +20,12 @@ class ChatDemoAppState(
     val pageViewHeight: Float,
     val pageViewWidth: Float,
     val statusBarHeight: Float,
-    val bottomSafeArea: Float
+    val bottomSafeArea: Float,
+    // UI 总配置
+    val uiConfig: AppUIConfig = AppUIConfig()
 ) {
+    /** 从 uiConfig 获取 App 配置 */
+    val appConfig: AppConfig get() = uiConfig.app
     // ==================== 输入相关状态 ====================
     
     /** 输入文本 */
@@ -41,14 +45,14 @@ class ChatDemoAppState(
     /** 半浮层状态 */
     val halfViewState = CapsuleHalfViewState()
     
-    /** 胶囊栏配置 */
-    val capsuleBarConfig = defaultCapsuleBarConfig()
+    /** 胶囊栏配置 - 从 uiConfig 获取 */
+    val capsuleBarConfig = uiConfig.capsuleBar
     
-    /** AI 写作半浮层配置 */
-    val aiWriteHalfViewConfig = createAIWriteHalfViewConfig()
+    /** AI 写作半浮层配置 - 使用 uiConfig.halfViewUI */
+    val aiWriteHalfViewConfig = createAIWriteHalfViewConfig().copy(uiConfig = uiConfig.halfViewUI)
     
-    /** AI 绘图半浮层配置 */
-    val aiDrawHalfViewConfig = createAIDrawHalfViewConfig()
+    /** AI 绘图半浮层配置 - 使用 uiConfig.halfViewUI */
+    val aiDrawHalfViewConfig = createAIDrawHalfViewConfig().copy(uiConfig = uiConfig.halfViewUI)
     
     // ==================== 键盘和面板状态 ====================
     
@@ -64,7 +68,7 @@ class ChatDemoAppState(
     // ==================== 计算属性 ====================
     
     /** 底部栏默认高度 - 参考 QQAIBiz: layoutChatBottomDefaultHeight = 72dp */
-    val bottomBarDefaultHeight = LAYOUT_CHAT_BOTTOM_DEFAULT_HEIGHT
+    val bottomBarDefaultHeight = appConfig.chatBottomDefaultHeight
     
     /**
      * 内容区域底部边距 = 底部栏高度 + 底部安全区（固定值）
@@ -111,7 +115,7 @@ class ChatDemoAppState(
     
     /** 图片选择区域高度（只在有选中图片时显示） */
     private val imagePickerHeight: Float
-        get() = if (bottomBarState.hasPickedImages) IMAGE_PICKER_HEIGHT else 0f
+        get() = if (bottomBarState.hasPickedImages) appConfig.imagePickerHeight else 0f
     
     /**
      * 胶囊栏高度
@@ -152,7 +156,7 @@ class ChatDemoAppState(
             return when {
                 keyboardHeight > 0f -> basePadding + keyboardHeight + imagePickerHeight
                 extPanelHeight > 0f -> basePadding + extPanelHeight + imagePickerHeight
-                bottomBarState.hasPickedImages -> basePadding + IMAGE_PICKER_HEIGHT
+                bottomBarState.hasPickedImages -> basePadding + appConfig.imagePickerHeight
                 else -> basePadding
             }
         }
@@ -253,14 +257,16 @@ fun rememberAppState(
     pageViewHeight: Float,
     pageViewWidth: Float,
     statusBarHeight: Float,
-    bottomSafeArea: Float
+    bottomSafeArea: Float,
+    uiConfig: AppUIConfig = AppUIConfig()
 ): ChatDemoAppState {
     return remember {
         ChatDemoAppState(
             pageViewHeight = pageViewHeight,
             pageViewWidth = pageViewWidth,
             statusBarHeight = statusBarHeight,
-            bottomSafeArea = bottomSafeArea
+            bottomSafeArea = bottomSafeArea,
+            uiConfig = uiConfig
         )
     }
 }

@@ -1,8 +1,11 @@
 package com.tencent.kuikly.demo.pages.compose.chatDemo.configs
 
+import androidx.compose.runtime.Composable
 import com.tencent.kuikly.compose.ui.graphics.Color
 import com.tencent.kuikly.compose.ui.unit.Dp
+import com.tencent.kuikly.compose.ui.unit.TextUnit
 import com.tencent.kuikly.compose.ui.unit.dp
+import com.tencent.kuikly.compose.ui.unit.sp
 
 // ==================== 胶囊位常量定义（参考 QQAIBiz ChatCapsuleBar） ====================
 
@@ -124,7 +127,30 @@ data class ChatCapsuleBarConfig(
     val horizontalPadding: Dp = CAPSULE_BAR_HORIZONTAL_PADDING,
     val itemSpacing: Dp = CAPSULE_ITEM_SPACING,
     val borderRadius: Dp = CAPSULE_ITEM_BORDER_RADIUS,
-    val isDarkMode: Boolean = false
+    val isDarkMode: Boolean = false,
+    // ==================== 额外 UI 配置 ====================
+    /** 渐变高度 */
+    val gradientHeight: Dp = 36.dp,
+    /** 胶囊栏主体背景色 */
+    val capsuleBarBgColor: Color = Color(0xFFF7F7F7),
+    /** 胶囊项图标内边距 (start, top) */
+    val itemIconPaddingStart: Dp = 18.dp,
+    val itemIconPaddingTop: Dp = 12.dp,
+    /** 胶囊项图标展示大小 */
+    val itemIconDisplaySize: Dp = 24.dp,
+    /** 胶囊项文字字体大小 */
+    val itemFontSize: TextUnit = 14.sp,
+    /** 胶囊项文字内边距 */
+    val itemTextPaddingStart: Dp = 18.dp,
+    val itemTextPaddingEnd: Dp = 18.dp,
+    val itemTextPaddingBottom: Dp = 12.dp,
+    /** 列表底部内边距 */
+    val listBottomPadding: Dp = 12.dp,
+    // ==================== Builder ====================
+    /** 胶囊项 builder - 如果有值，直接调用 builder 来渲染单个胶囊项 */
+    val itemBuilder: (@Composable (item: CapsuleItemConfig, index: Int, config: ChatCapsuleBarConfig, onClick: () -> Unit) -> Unit)? = null,
+    /** 整体 builder - 如果有值，直接调用 builder 来渲染整个胶囊栏 */
+    val builder: (@Composable (config: ChatCapsuleBarConfig, onItemClick: (Int, CapsuleItemConfig) -> Unit) -> Unit)? = null
 )
 
 // ==================== 便捷构建器 ====================

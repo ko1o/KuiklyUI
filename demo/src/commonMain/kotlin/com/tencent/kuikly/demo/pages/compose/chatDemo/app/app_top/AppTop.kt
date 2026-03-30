@@ -23,88 +23,78 @@ import com.tencent.kuikly.compose.ui.text.font.FontWeight
 import com.tencent.kuikly.compose.ui.unit.dp
 import com.tencent.kuikly.compose.ui.unit.sp
 import com.tencent.kuikly.core.base.attr.ImageUri
+import com.tencent.kuikly.demo.pages.compose.chatDemo.configs.AppTopConfig
 
 /**
  * 顶部区域组件
- * 
- * 参考 QQAIBiz 的 AppTop 结构：
- * - 状态栏占位
- * - 导航栏（返回按钮、标题、可选右侧按钮）
- * - 分割线
  */
 @Composable
 fun AppTop(
     statusBarHeight: Float,
     onBack: () -> Unit,
-    title: String = "AI Chat",
+    config: AppTopConfig = AppTopConfig(),
     modifier: Modifier = Modifier
 ) {
+    // 如果有整体 builder，直接调用
+    if (config.builder != null) {
+        config.builder.invoke(statusBarHeight, onBack)
+        return
+    }
+    
     // 状态栏占位
     Spacer(modifier = Modifier.height(statusBarHeight.dp))
 
     // 导航栏
-    NavBar(
-        title = title,
-        onBack = onBack,
-        modifier = modifier
-    )
+    if (config.navBarBuilder != null) {
+        config.navBarBuilder.invoke(config.title, onBack)
+    } else {
+        NavBar(config = config, onBack = onBack, modifier = modifier)
+    }
 
     // 分割线
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(1.dp)
-            .background(Color(0xFFE3E3E3))
+            .height(config.dividerHeight)
+            .background(config.dividerColor)
     )
 }
 
-/**
- * 导航栏组件
- * 
- * 布局：左侧返回按钮 - 中间标题 - 右侧占位
- */
 @OptIn(InternalResourceApi::class)
 @Composable
 private fun NavBar(
-    title: String,
+    config: AppTopConfig,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(44.dp)
-            .padding(horizontal = 12.dp),
+            .height(config.navBarHeight)
+            .padding(horizontal = config.navBarHorizontalPadding),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 返回按钮
-        val drawable = DrawableResource(ImageUri.pageAssets(BACK_ICON).toUrl("ChatDemo"))
+        val drawable = DrawableResource(ImageUri.pageAssets(config.backIcon).toUrl(config.pageName))
         Image(
             painter = painterResource(drawable),
             contentDescription = "Back",
             modifier = Modifier
-                .size(16.dp)
+                .size(config.backIconSize)
                 .clickable { onBack() }
         )
         
         Spacer(modifier = Modifier.weight(1f))
         
-        // 标题
         Text(
-            text = title,
-            fontSize = 17.sp,
+            text = config.title,
+            fontSize = config.titleFontSize,
             fontWeight = FontWeight.Bold,
-            color = Color.Black,
+            color = config.titleColor,
             modifier = Modifier.align(Alignment.CenterVertically)
         )
         
         Spacer(modifier = Modifier.weight(1f))
         
-        // 右侧占位
-        Box(modifier = Modifier.width(20.dp))
+        Box(modifier = Modifier.width(config.rightPlaceholderWidth))
     }
 }
-
-// ==================== 常量定义 ====================
-
-private const val BACK_ICON = "ic_back.png"

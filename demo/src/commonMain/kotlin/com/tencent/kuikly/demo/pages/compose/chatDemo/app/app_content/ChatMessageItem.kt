@@ -17,98 +17,64 @@ import com.tencent.kuikly.compose.ui.graphics.Path
 import com.tencent.kuikly.compose.ui.unit.Dp
 import com.tencent.kuikly.compose.ui.unit.dp
 import com.tencent.kuikly.compose.ui.unit.sp
+import com.tencent.kuikly.demo.pages.compose.chatDemo.configs.ChatMessageItemConfig
 
 /**
  * 聊天消息项组件
- * 
- * 支持用户消息和 AI 消息两种样式：
- * - 用户消息：右对齐，带气泡和右侧三角
- * - AI 消息：左对齐，使用 Markdown 渲染
  */
 @Composable
 fun ChatMessageItem(
     message: String,
     isUser: Boolean,
-    maxWidth: Dp
+    maxWidth: Dp,
+    config: ChatMessageItemConfig = ChatMessageItemConfig()
 ) {
     if (isUser) {
-        UserMessageItem(message = message, maxWidth = maxWidth)
+        if (config.userMessageBuilder != null) {
+            config.userMessageBuilder.invoke(message, maxWidth)
+        } else {
+            UserMessageItem(message = message, maxWidth = maxWidth, config = config)
+        }
     } else {
-        AiMessageItem(message = message, maxWidth = maxWidth)
+        if (config.aiMessageBuilder != null) {
+            config.aiMessageBuilder.invoke(message, maxWidth)
+        } else {
+            AiMessageItem(message = message, maxWidth = maxWidth, config = config)
+        }
     }
 }
 
-/**
- * 用户消息项
- */
 @Composable
-private fun UserMessageItem(
-    message: String,
-    maxWidth: Dp
-) {
+private fun UserMessageItem(message: String, maxWidth: Dp, config: ChatMessageItemConfig) {
     Box(
         modifier = Modifier
             .widthIn(max = maxWidth)
-            .padding(bottom = 4.dp, end = 8.dp)
+            .padding(bottom = config.userBottomPadding, end = config.userEndPadding)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // 消息气泡
             Box(
                 modifier = Modifier
-                    .background(
-                        color = Color(0xFFE9E9EB),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                    .padding(horizontal = 10.dp, vertical = 10.dp)
+                    .background(color = config.userBubbleColor, shape = RoundedCornerShape(config.userBubbleCornerRadius))
+                    .padding(horizontal = config.userBubbleHorizontalPadding, vertical = config.userBubbleVerticalPadding)
             ) {
-                Text(
-                    text = message,
-                    fontSize = 14.sp,
-                    color = Color.Black
-                )
+                Text(text = message, fontSize = config.userTextFontSize, color = config.userTextColor)
             }
-            
-            // 右侧三角
             Canvas(
-                modifier = Modifier
-                    .size(6.dp, 12.dp)
-                    .align(Alignment.CenterVertically)
+                modifier = Modifier.size(config.triangleWidth, config.triangleHeight).align(Alignment.CenterVertically)
             ) {
-                val width = size.width
-                val height = size.height
-                val path = Path().apply {
-                    moveTo(0f, 0f)
-                    lineTo(0f, height)
-                    lineTo(width, height / 2f)
-                    close()
-                }
-                drawPath(path = path, color = Color(0xFFE9E9EB))
+                val w = size.width; val h = size.height
+                val path = Path().apply { moveTo(0f, 0f); lineTo(0f, h); lineTo(w, h / 2f); close() }
+                drawPath(path = path, color = config.userBubbleColor)
             }
         }
     }
 }
 
-/**
- * AI 消息项
- * 
- * 使用 Markdown 渲染 AI 回复内容
- */
 @Composable
-private fun AiMessageItem(
-    message: String,
-    maxWidth: Dp
-) {
-    // 简化实现：直接显示文本
-    // 实际使用时可以集成 Markdown 组件
+private fun AiMessageItem(message: String, maxWidth: Dp, config: ChatMessageItemConfig) {
     Box(
-        modifier = Modifier
-            .widthIn(max = maxWidth)
-            .padding(horizontal = 24.dp)
+        modifier = Modifier.widthIn(max = maxWidth).padding(horizontal = config.aiHorizontalPadding)
     ) {
-        Text(
-            text = message,
-            fontSize = 14.sp,
-            color = Color.Black
-        )
+        Text(text = message, fontSize = config.aiTextFontSize, color = config.aiTextColor)
     }
 }
