@@ -24,7 +24,6 @@ import com.tencent.kuikly.compose.ui.unit.dp
 import com.tencent.kuikly.core.log.KLog
 import com.tencent.kuikly.demo.pages.compose.chatDemo.app.app_bottom.AppBottom
 import com.tencent.kuikly.demo.pages.compose.chatDemo.app.app_content.AppContent
-import com.tencent.kuikly.demo.pages.compose.chatDemo.app.app_float.AppContentFloat
 import com.tencent.kuikly.demo.pages.compose.chatDemo.app.app_top.AppTop
 import com.tencent.kuikly.demo.pages.compose.chatDemo.configs.*
 import com.tencent.kuikly.demo.pages.compose.chatDemo.widgets.*
@@ -47,7 +46,7 @@ import com.tencent.kuikly.demo.pages.compose.chatDemo.widgets.*
  * 3. 底部栏使用全屏高度容器 + transform 偏移，确保动画流畅
  */
 @Composable
-fun ChatDemoApp(
+fun App(
     appState: ChatDemoAppState,
     onBack: () -> Unit = {},
     onSend: (String) -> Unit = {},
@@ -122,7 +121,7 @@ fun ChatDemoApp(
         modifier = Modifier
             .fillMaxWidth()
             .height(appState.pageViewHeight.dp)
-            .background(Color(0xFFF4F4FE))
+            .background(Color(0xFFF7F7F7))  // 参考 QQAIBiz: AIProductUIToken.Color.bg_aio_01
     ) {
         // 主内容区域 - 高度固定，不随键盘变化
         Column(
@@ -142,17 +141,13 @@ fun ChatDemoApp(
                 listState = listState,
                 listBottomPadding = animatedListPadding,
                 pageViewWidth = appState.pageViewWidth,
-                halfViewState = appState.halfViewState,
-                capsuleBarConfig = appState.capsuleBarConfig,
-                aiWriteHalfViewConfig = appState.aiWriteHalfViewConfig,
-                aiDrawHalfViewConfig = appState.aiDrawHalfViewConfig,
                 onInputTextChange = { appState.inputText = it },
-                onCapsuleItemClick = onCapsuleItemClick,
                 modifier = Modifier.weight(1f)
             )
         }
 
         // 底部输入栏容器 - 使用全屏高度容器 + transform 偏移
+        // 注意：胶囊栏已移入 AppBottom，与底部输入栏一起移动
         AppBottom(
             appState = appState,
             animatedBottomOffset = animatedBottomOffset,
@@ -160,7 +155,8 @@ fun ChatDemoApp(
             onStop = onStop,
             onExtensionPanelItemClick = onExtensionPanelItemClick,
             onVoiceRecordStart = onVoiceRecordStart,
-            onVoiceRecordEnd = onVoiceRecordEnd
+            onVoiceRecordEnd = onVoiceRecordEnd,
+            onCapsuleItemClick = onCapsuleItemClick
         )
     }
 }

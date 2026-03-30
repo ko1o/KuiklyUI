@@ -34,8 +34,6 @@ import com.tencent.kuikly.compose.ui.unit.dp
 import com.tencent.kuikly.compose.ui.unit.sp
 import com.tencent.kuikly.core.base.attr.ImageUri
 import com.tencent.kuikly.core.log.KLog
-import com.tencent.kuikly.demo.pages.compose.chatDemo.app.app_float.AppContentFloat
-import com.tencent.kuikly.demo.pages.compose.chatDemo.configs.*
 import com.tencent.kuikly.demo.pages.compose.chatDemo.widgets.*
 
 /**
@@ -43,9 +41,10 @@ import com.tencent.kuikly.demo.pages.compose.chatDemo.widgets.*
  * 
  * 参考 QQAIBiz 的 AppContent 结构：
  * - 消息列表 / 欢迎页（二选一）
- * - 浮动元素（半浮层遮罩、胶囊栏等）
  * 
- * 注意：为了首屏速度和 layout 刷新速度，不要依赖别的布局来计算高度
+ * 注意：
+ * - 胶囊栏和半浮层已移到 AppBottom 中，与底部输入栏一起移动
+ * - 为了首屏速度和 layout 刷新速度，不要依赖别的布局来计算高度
  */
 @Composable
 fun AppContent(
@@ -53,12 +52,7 @@ fun AppContent(
     listState: LazyListState,
     listBottomPadding: Float,
     pageViewWidth: Float,
-    halfViewState: CapsuleHalfViewState,
-    capsuleBarConfig: ChatCapsuleBarConfig,
-    aiWriteHalfViewConfig: CapsuleHalfViewConfig,
-    aiDrawHalfViewConfig: CapsuleHalfViewConfig,
     onInputTextChange: (String) -> Unit,
-    onCapsuleItemClick: (Int, CapsuleItemConfig) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxWidth()) {
@@ -79,15 +73,6 @@ fun AppContent(
                 modifier = Modifier.fillMaxSize()
             )
         }
-        
-        // 浮动元素区域
-        AppContentFloat(
-            halfViewState = halfViewState,
-            capsuleBarConfig = capsuleBarConfig,
-            aiWriteHalfViewConfig = aiWriteHalfViewConfig,
-            aiDrawHalfViewConfig = aiDrawHalfViewConfig,
-            onCapsuleItemClick = onCapsuleItemClick
-        )
     }
 }
 

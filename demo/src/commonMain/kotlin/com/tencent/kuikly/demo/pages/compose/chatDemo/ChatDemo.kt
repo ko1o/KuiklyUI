@@ -83,7 +83,7 @@ internal class ChatDemo : ComposeContainer() {
         }
         
         // 创建应用状态
-        val appState = rememberChatDemoAppState(
+        val appState = rememberAppState(
             pageViewHeight = pagerData.pageViewHeight,
             pageViewWidth = pagerData.pageViewWidth,
             statusBarHeight = pagerData.statusBarHeight,
@@ -91,7 +91,7 @@ internal class ChatDemo : ComposeContainer() {
         )
         
         // 主 UI 组件
-        ChatDemoApp(
+        App(
             appState = appState,
             onBack = {
                 getPager().acquireModule<RouterModule>(RouterModule.MODULE_NAME).closePage()

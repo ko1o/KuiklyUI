@@ -63,26 +63,49 @@ class ChatDemoAppState(
     
     // ==================== 计算属性 ====================
     
-    /** 底部栏默认高度 */
-    private val bottomBarDefaultHeight = LAYOUT_CHAT_BOTTOM_DEFAULT_HEIGHT
+    /** 底部栏默认高度 - 参考 QQAIBiz: layoutChatBottomDefaultHeight = 72dp */
+    val bottomBarDefaultHeight = LAYOUT_CHAT_BOTTOM_DEFAULT_HEIGHT
     
-    /** 内容区域底部边距 = 底部栏高度 + 底部安全区（固定值） */
+    /**
+     * 内容区域底部边距 = 底部栏高度 + 底部安全区（固定值）
+     * 
+     * 参考 QQAIBiz App.kt 第 38-39 行:
+     *   marginBottom = layoutChatBottomDefaultHeight + offsetForNavBar
+     */
     val marginBottom: Float
         get() = bottomBarDefaultHeight + bottomSafeArea
     
-    /** 内容区域高度 = 页面高度 - marginBottom（固定值，不随键盘变化） */
+    /**
+     * 内容区域高度 = 页面高度 - marginBottom（固定值，不随键盘变化）
+     * 
+     * 参考 QQAIBiz App.kt 第 41-46 行:
+     *   contentHeight = appHeight - marginBottom
+     * 
+     * 注意：此高度不包含胶囊栏避让。胶囊栏的避让通过 listBottomPadding 实现
+     */
     val contentHeight: Float
         get() = pageViewHeight - marginBottom
     
-    /** 键盘弹出时的偏移量 */
+    /**
+     * 键盘弹出时的偏移量
+     * 
+     * 参考 QQAIBiz BabyQBaseViewModel 第 331-336 行:
+     *   offsetForKeyboard = -(keyboardHeight - offsetForNavBar)  // 键盘展开时
+     *   offsetForKeyboard = 0                                    // 键盘收起时
+     */
     private val offsetForKeyboard: Float
         get() = if (keyboardHeight > 0f) {
-            -keyboardHeight + (bottomBarDefaultHeight - bottomSafeArea)
+            -(keyboardHeight - bottomSafeArea)
         } else {
             0f
         }
     
-    /** 底部栏总偏移 = 仅键盘偏移 */
+    /**
+     * 底部栏总偏移
+     * 
+     * 参考 QQAIBiz BabyQBaseViewModel 第 349 行:
+     *   bottomBarMove = offsetForKeyboard + offsetForExtBottom
+     */
     val bottomBarOffset: Float
         get() = offsetForKeyboard
     
@@ -90,17 +113,48 @@ class ChatDemoAppState(
     private val imagePickerHeight: Float
         get() = if (bottomBarState.hasPickedImages) IMAGE_PICKER_HEIGHT else 0f
     
-    /** 胶囊栏高度 */
+    /**
+     * 胶囊栏高度
+     * 
+     * 参考 QQAIBiz: capsuleHeight = layoutCapsuleBarDefaultHeight = 84dp
+     */
     val capsuleBarHeight: Float
         get() = if (capsuleBarConfig.items.isNotEmpty()) CAPSULE_BAR_DEFAULT_HEIGHT.value else 0f
     
-    /** 列表底部 padding - 用于避让键盘或扩展面板 */
+    /**
+     * 胶囊栏区域总高度（渐变 + 胶囊栏 + 间距）
+     * 
+     * 参考 QQAIBiz ChatCapsuleBar:
+     * - Box 120dp (包含渐变图片 121dp + 胶囊栏 84dp)
+     * - 胶囊栏与输入框间距 12dp
+     */
+    private val capsuleAreaTotalHeight: Float
+        get() = if (capsuleBarConfig.items.isNotEmpty()) {
+            CAPSULE_BAR_DEFAULT_HEIGHT.value // 胶囊栏高度 84dp（内部 contentPadding 已含底部间距）
+        } else {
+            0f
+        }
+    
+    /**
+     * 列表底部 padding - 用于避让胶囊栏、键盘或扩展面板
+     * 
+     * 参考 QQAIBiz AppContent FootView:
+     *   FootView 高度 = 8.dp + (-listMove.value)
+     *   listMove.value = offsetForKeyboardAndPadding + offsetForExtBottom + offsetForSendArea
+     *   offsetForSendArea -= capsuleHeight (= -84dp)
+     * 
+     * 胶囊栏始终需要避让（capsuleAreaTotalHeight）
+     * 键盘弹出时额外加上键盘高度
+     */
     val listBottomPadding: Float
-        get() = when {
-            keyboardHeight > 0f -> keyboardHeight + imagePickerHeight
-            extPanelHeight > 0f -> extPanelHeight + imagePickerHeight
-            bottomBarState.hasPickedImages -> IMAGE_PICKER_HEIGHT
-            else -> 0f
+        get() {
+            val basePadding = capsuleAreaTotalHeight
+            return when {
+                keyboardHeight > 0f -> basePadding + keyboardHeight + imagePickerHeight
+                extPanelHeight > 0f -> basePadding + extPanelHeight + imagePickerHeight
+                bottomBarState.hasPickedImages -> basePadding + IMAGE_PICKER_HEIGHT
+                else -> basePadding
+            }
         }
     
     // ==================== 方法 ====================
@@ -119,10 +173,10 @@ class ChatDemoAppState(
 }
 
 /**
- * 创建并记住 ChatDemoAppState
+ * 创建并记住 AppState
  */
 @Composable
-fun rememberChatDemoAppState(
+fun rememberAppState(
     pageViewHeight: Float,
     pageViewWidth: Float,
     statusBarHeight: Float,

@@ -1,13 +1,12 @@
 package com.tencent.kuikly.demo.pages.compose.chatDemo.widgets
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import com.tencent.kuikly.compose.animation.AnimatedVisibility
 import com.tencent.kuikly.compose.animation.core.tween
-import com.tencent.kuikly.compose.animation.fadeIn
-import com.tencent.kuikly.compose.animation.fadeOut
 import com.tencent.kuikly.compose.animation.slideInVertically
 import com.tencent.kuikly.compose.animation.slideOutVertically
 import com.tencent.kuikly.compose.foundation.Canvas
@@ -56,6 +55,18 @@ private const val HALF_VIEW_ANIM_DURATION = 250
 
 // ==================== 胶囊半浮层组件 ====================
 
+/**
+ * 带动画的胶囊半浮层组件
+ * 
+ * 参考 QQAIBiz CapsuleFloating + DrawFloatingCapsule 的实现：
+ * - 使用 AnimatedVisibility + slideInVertically/slideOutVertically 实现从底部弹出/收起的动画
+ * - 使用 lastConfig 缓存配置，确保退出动画期间内容不消失
+ * - 动画时长 250ms
+ * 
+ * 关键实现（参考 DrawFloatingCapsule 第 126-178 行）：
+ * - 通过缓存 lastConfig 在退出动画期间保持内容显示
+ * - AnimatedVisibility 内部直接使用 config 或 lastConfig 来渲染内容
+ */
 @Composable
 fun AnimatedCapsuleHalfView(
     config: CapsuleHalfViewConfig?,
@@ -63,24 +74,129 @@ fun AnimatedCapsuleHalfView(
     onPlaceholderChange: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    // 缓存最后一个有效的 config，用于退出动画期间显示内容
+    val lastConfig = remember { mutableStateOf<CapsuleHalfViewConfig?>(null) }
+    
+    // 参考 QQAIBiz DrawFloatingCapsule：进入时缓存 config
+    LaunchedEffect(config) {
+        if (config != null) {
+            lastConfig.value = config
+        }
+    }
+    
+    // 参考 QQAIBiz AnimatedTransitionBox + DIRECTION_FROM_BOTTOM
     AnimatedVisibility(
         visible = config != null,
         enter = slideInVertically(
-            initialOffsetY = { it },
+            initialOffsetY = { fullHeight -> fullHeight }, // 从底部进入
             animationSpec = tween(HALF_VIEW_ANIM_DURATION)
-        ) + fadeIn(animationSpec = tween(HALF_VIEW_ANIM_DURATION)),
+        ),
         exit = slideOutVertically(
-            targetOffsetY = { it },
+            targetOffsetY = { fullHeight -> fullHeight }, // 向底部退出
             animationSpec = tween(HALF_VIEW_ANIM_DURATION)
-        ) + fadeOut(animationSpec = tween(HALF_VIEW_ANIM_DURATION)),
+        ),
         modifier = modifier
     ) {
-        config?.let {
+        // 使用 config 或 lastConfig 来渲染内容
+        // 退出动画期间 config 为 null，使用 lastConfig 保持内容显示
+        val displayConfig = config ?: lastConfig.value
+        displayConfig?.let {
             CapsuleHalfView(
                 config = it,
                 onClose = onClose,
                 onPlaceholderChange = onPlaceholderChange
             )
+        }
+    }
+    
+    // 退出动画完成后清空缓存
+    LaunchedEffect(config) {
+        if (config == null) {
+            kotlinx.coroutines.delay(HALF_VIEW_ANIM_DURATION.toLong() + 50)
+            lastConfig.value = null
+        }
+    }
+}
+
+// 半浮层背景色 - 参考 QQAIBiz: AIProductUIToken.Color.bg_bottom_light
+private val HALF_VIEW_BG_COLOR = Color.White
+
+/**
+ * 带底部输入栏的胶囊半浮层组件
+ * 
+ * 参考 QQAIBiz CapsuleFloating + QueryHalfWriteView 的实现：
+ * - 半浮层和底部输入栏作为一体，从底部弹出覆盖胶囊栏
+ * - 使用 AnimatedVisibility 控制整体的进入/退出动画
+ * - 半浮层有顶部圆角，输入栏无圆角，两者连成一体
+ * - 整体有白色背景，完全覆盖下层内容（包括胶囊栏）
+ * 
+ * 布局结构：
+ * - Column (整体，有白色背景和顶部圆角)
+ *   - CapsuleHalfView (半浮层内容)
+ *   - bottomBar (底部输入栏，无圆角)
+ */
+@Composable
+fun AnimatedCapsuleHalfViewWithBottomBar(
+    config: CapsuleHalfViewConfig?,
+    onClose: () -> Unit = {},
+    onPlaceholderChange: (String) -> Unit = {},
+    modifier: Modifier = Modifier,
+    bottomBar: @Composable () -> Unit = {}
+) {
+    // 缓存最后一个有效的 config，用于退出动画期间显示内容
+    val lastConfig = remember { mutableStateOf<CapsuleHalfViewConfig?>(null) }
+    
+    // 参考 QQAIBiz DrawFloatingCapsule：进入时缓存 config
+    LaunchedEffect(config) {
+        if (config != null) {
+            lastConfig.value = config
+        }
+    }
+    
+    // 参考 QQAIBiz AnimatedTransitionBox + DIRECTION_FROM_BOTTOM
+    // 整个半浮层 + 输入栏作为一体进行动画
+    AnimatedVisibility(
+        visible = config != null,
+        enter = slideInVertically(
+            initialOffsetY = { fullHeight -> fullHeight }, // 从底部进入
+            animationSpec = tween(HALF_VIEW_ANIM_DURATION)
+        ),
+        exit = slideOutVertically(
+            targetOffsetY = { fullHeight -> fullHeight }, // 向底部退出
+            animationSpec = tween(HALF_VIEW_ANIM_DURATION)
+        ),
+        modifier = modifier
+    ) {
+        // 使用 config 或 lastConfig 来渲染内容
+        // 退出动画期间 config 为 null，使用 lastConfig 保持内容显示
+        val displayConfig = config ?: lastConfig.value
+        displayConfig?.let {
+            // 半浮层 + 输入栏垂直排列
+            // 参考 QQAIBiz QueryHalfWriteView：整体有背景色，完全覆盖下层内容
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(topStart = HALF_VIEW_CORNER_RADIUS, topEnd = HALF_VIEW_CORNER_RADIUS))
+                    .background(HALF_VIEW_BG_COLOR)  // 白色背景，完全覆盖胶囊栏
+            ) {
+                // 半浮层内容
+                CapsuleHalfViewContent(
+                    config = it,
+                    onClose = onClose,
+                    onPlaceholderChange = onPlaceholderChange
+                )
+                
+                // 底部输入栏（无圆角，与半浮层连成一体）
+                bottomBar()
+            }
+        }
+    }
+    
+    // 退出动画完成后清空缓存
+    LaunchedEffect(config) {
+        if (config == null) {
+            kotlinx.coroutines.delay(HALF_VIEW_ANIM_DURATION.toLong() + 50)
+            lastConfig.value = null
         }
     }
 }
@@ -98,54 +214,69 @@ fun CapsuleHalfView(
             .clip(RoundedCornerShape(topStart = HALF_VIEW_CORNER_RADIUS, topEnd = HALF_VIEW_CORNER_RADIUS))
             .background(Color.White)
     ) {
-        HalfViewTitleBar(
-            title = config.title,
-            titleIcon = config.titleIcon,
-            onClose = onClose
+        CapsuleHalfViewContent(
+            config = config,
+            onClose = onClose,
+            onPlaceholderChange = onPlaceholderChange
         )
-
-        if (config.showTypeSection && config.typeItems.isNotEmpty()) {
-            HalfViewTypeSection(
-                title = config.typeTitle,
-                items = config.typeItems,
-                gridRows = config.typeGridRows,
-                onTypeSelected = { selectedType ->
-                    config.typeItems.forEach { item ->
-                        if (item == selectedType) {
-                            item.picked.value = !item.picked.value
-                            if (item.picked.value) {
-                                config.requireBarItems.value = selectedType.requireBarItems
-                            } else {
-                                config.requireBarItems.value = config.defaultTypeItem?.requireBarItems ?: emptyList()
-                            }
-                        } else {
-                            item.picked.value = false
-                        }
-                    }
-                    val currentSelected = config.getSelectedTypeItem()
-                    val placeholder = currentSelected?.placeholder ?: config.defaultTypeItem?.placeholder ?: config.placeholder
-                    onPlaceholderChange(placeholder)
-                }
-            )
-        }
-
-        if (config.showRequireSection && config.requireBarItems.value.isNotEmpty()) {
-            HalfViewRequireSection(
-                title = config.requireTitle,
-                items = config.requireBarItems.value,
-                showTitle = config.requireTitle.isNotEmpty()
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(0.5.dp)
-                .background(Color(0xFFE5E5E5))
-        )
-
-        Spacer(modifier = Modifier.height(19.dp))
     }
+}
+
+/**
+ * 半浮层内容组件 - 不包含圆角和背景色
+ * 用于 AnimatedCapsuleHalfViewWithBottomBar 中，避免重复设置圆角和背景
+ */
+@Composable
+private fun CapsuleHalfViewContent(
+    config: CapsuleHalfViewConfig,
+    onClose: () -> Unit = {},
+    onPlaceholderChange: (String) -> Unit = {}
+) {
+    HalfViewTitleBar(
+        title = config.title,
+        titleIcon = config.titleIcon,
+        onClose = onClose
+    )
+
+    if (config.showTypeSection && config.typeItems.isNotEmpty()) {
+        HalfViewTypeSection(
+            title = config.typeTitle,
+            items = config.typeItems,
+            gridRows = config.typeGridRows,
+            onTypeSelected = { selectedType ->
+                config.typeItems.forEach { item ->
+                    if (item == selectedType) {
+                        item.picked.value = !item.picked.value
+                        if (item.picked.value) {
+                            config.requireBarItems.value = selectedType.requireBarItems
+                        } else {
+                            config.requireBarItems.value = config.defaultTypeItem?.requireBarItems ?: emptyList()
+                        }
+                    } else {
+                        item.picked.value = false
+                    }
+                }
+                val currentSelected = config.getSelectedTypeItem()
+                val placeholder = currentSelected?.placeholder ?: config.defaultTypeItem?.placeholder ?: config.placeholder
+                onPlaceholderChange(placeholder)
+            }
+        )
+    }
+
+    if (config.showRequireSection && config.requireBarItems.value.isNotEmpty()) {
+        HalfViewRequireSection(
+            title = config.requireTitle,
+            items = config.requireBarItems.value,
+            showTitle = config.requireTitle.isNotEmpty()
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(0.5.dp)
+            .background(Color(0xFFE5E5E5))
+    )
 }
 
 // ==================== 标题栏 ====================
