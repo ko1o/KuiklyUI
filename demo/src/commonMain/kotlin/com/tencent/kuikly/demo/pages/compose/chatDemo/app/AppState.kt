@@ -170,6 +170,79 @@ class ChatDemoAppState(
             bottomBarState.showExtensionPanel.value = false
         }
     }
+    
+    // ==================== 半浮层选中内容拼接逻辑（参考 QQAIBiz BabyQCapsuleViewModel） ====================
+    
+    /**
+     * 重新生成带选中条件的输入文本
+     * 
+     * 参考 QQAIBiz BabyQCapsuleViewModel.reGenerateInputText() 第 228-292 行：
+     * - 如果半浮层显示，则将用户输入与选中的条件进行拼接
+     * - 如果半浮层不显示，则直接返回原始输入
+     * 
+     * @param input 用户输入的原始文本
+     * @return 拼接了选中条件后的完整文本
+     */
+    fun reGenerateInputText(input: String): String {
+        // 如果半浮层正在显示，使用当前配置的拼接逻辑
+        val currentConfig = halfViewState.currentConfig.value ?: return input
+        return currentConfig.reGenerateInputText(input)
+    }
+    
+    /**
+     * 获取当前半浮层场景
+     * 
+     * 参考 QQAIBiz BabyQCapsuleViewModel.currentScene()
+     */
+    fun currentHalfViewScene(): HalfViewScene {
+        val config = halfViewState.currentConfig.value ?: return HalfViewScene.NONE
+        return when (config.id) {
+            "ai_draw" -> HalfViewScene.AI_DRAW
+            "ai_write" -> HalfViewScene.AI_WRITE
+            else -> HalfViewScene.NONE
+        }
+    }
+    
+    /**
+     * 发送消息后的清理操作
+     * 
+     * 参考 QQAIBiz BabyQBottomViewModel.doSendMsgInner() 第 511-516 行：
+     * - 重置输入框
+     * - 隐藏图片选择器
+     * - 重置半浮层选中状态（但不关闭半浮层）
+     * 
+     * 注意：这里不会关闭半浮层，只是清空选中的条件内容
+     */
+    fun onSendMessageCleanup() {
+        // 清空图片选择
+        bottomBarState.imagePickerState.clearImages()
+        
+        // 重置半浮层选中内容（但不关闭半浮层）
+        halfViewState.currentConfig.value?.reset()
+    }
+    
+    /**
+     * 关闭半浮层并清空所有状态
+     * 
+     * 参考 QQAIBiz BabyQCapsuleViewModel.hideCapsuleHalfView()
+     */
+    fun hideCapsuleHalfView() {
+        halfViewState.hide()
+    }
+}
+
+/**
+ * 半浮层场景枚举
+ * 
+ * 参考 QQAIBiz AICapsuleScene
+ */
+enum class HalfViewScene {
+    /** AI绘画场景 */
+    AI_DRAW,
+    /** AI写作场景 */
+    AI_WRITE,
+    /** 无场景 */
+    NONE
 }
 
 /**

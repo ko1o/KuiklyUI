@@ -3,6 +3,7 @@ package com.tencent.kuikly.demo.pages.compose.chatDemo.app.app_bottom
 import androidx.compose.runtime.Composable
 import com.tencent.kuikly.compose.foundation.background
 import com.tencent.kuikly.compose.foundation.clickable
+import com.tencent.kuikly.compose.foundation.gestures.awaitEachGesture
 import com.tencent.kuikly.compose.foundation.layout.Box
 import com.tencent.kuikly.compose.foundation.layout.Column
 import com.tencent.kuikly.compose.foundation.layout.Spacer
@@ -15,6 +16,7 @@ import com.tencent.kuikly.compose.ui.Alignment
 import com.tencent.kuikly.compose.ui.Modifier
 import com.tencent.kuikly.compose.ui.draw.clip
 import com.tencent.kuikly.compose.ui.graphics.Color
+import com.tencent.kuikly.compose.ui.input.pointer.pointerInput
 import com.tencent.kuikly.compose.ui.unit.dp
 import com.tencent.kuikly.core.log.KLog
 import com.tencent.kuikly.demo.pages.compose.chatDemo.app.ChatDemoAppState
@@ -61,13 +63,22 @@ fun AppBottom(
                 .fillMaxWidth()
                 .weight(1f)
         ) {
-            // 半浮层蒙层 - 全屏覆盖，点击关闭半浮层
-            // 参考 QQAIBiz CapsuleMask
+            // 半浮层蒙层 - 全屏覆盖，点击关闭半浮层，同时拦截所有滑动事件
+            // 参考 QQAIBiz CapsuleMask 和 Popover 的 pointerInput 实现
             if (isHalfViewVisible) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color(0x33000000))
+                        .pointerInput(Unit) {
+                            // 消费所有触摸事件，阻止滑动事件透过蒙层
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    event.changes.forEach { it.consume() }
+                                }
+                            }
+                        }
                         .clickable { appState.halfViewState.hide() }
                 )
             }

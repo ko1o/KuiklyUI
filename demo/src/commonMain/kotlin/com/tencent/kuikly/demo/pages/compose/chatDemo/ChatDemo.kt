@@ -119,11 +119,33 @@ internal class ChatDemo : ComposeContainer() {
     
     /**
      * 处理发送消息
+     * 
+     * 参考 QQAIBiz BabyQBottomViewModel.doSendMsgInner()：
+     * 1. 使用 reGenerateInputText() 将用户输入与半浮层选中的条件拼接
+     * 2. 发送拼接后的完整文本
+     * 3. 发送完成后调用 onSendMessageCleanup() 清空选中状态
      */
     private fun handleSendMessage(appState: ChatDemoAppState, message: String) {
-        appState.chatList.add(message)
+        // 获取拼接后的完整文本（包含半浮层选中的条件）
+        val fullMessage = appState.reGenerateInputText(message)
+        
+        // 记录日志，方便调试
+        val scene = appState.currentHalfViewScene()
+        if (scene != HalfViewScene.NONE) {
+            KLog.i("ChatDemo", "半浮层场景: $scene")
+            KLog.i("ChatDemo", "原始输入: $message")
+            KLog.i("ChatDemo", "拼接后文本: $fullMessage")
+        }
+        
+        // 添加到聊天列表
+        appState.chatList.add(fullMessage)
         appState.bottomBarState.startGenerating()
         
+        // 发送后收起半浮层面板并清空选中内容
+        appState.hideCapsuleHalfView()
+        appState.onSendMessageCleanup()
+        
+        // 模拟 AI 回复
         GlobalScope.launch {
             appState.chatList.add("")
             MOCK_MARKDOWN_RESPONSE.forEachIndexed { index, _ ->

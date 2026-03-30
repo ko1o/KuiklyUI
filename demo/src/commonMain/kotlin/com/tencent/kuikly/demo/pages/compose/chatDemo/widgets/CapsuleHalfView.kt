@@ -9,6 +9,7 @@ import com.tencent.kuikly.compose.animation.AnimatedVisibility
 import com.tencent.kuikly.compose.animation.core.tween
 import com.tencent.kuikly.compose.animation.slideInVertically
 import com.tencent.kuikly.compose.animation.slideOutVertically
+import com.tencent.kuikly.compose.coil3.rememberAsyncImagePainter
 import com.tencent.kuikly.compose.foundation.Canvas
 import com.tencent.kuikly.compose.foundation.Image
 import com.tencent.kuikly.compose.foundation.background
@@ -20,8 +21,10 @@ import com.tencent.kuikly.compose.foundation.layout.Column
 import com.tencent.kuikly.compose.foundation.layout.PaddingValues
 import com.tencent.kuikly.compose.foundation.layout.Row
 import com.tencent.kuikly.compose.foundation.layout.Spacer
+import com.tencent.kuikly.compose.foundation.layout.fillMaxSize
 import com.tencent.kuikly.compose.foundation.layout.fillMaxWidth
 import com.tencent.kuikly.compose.foundation.layout.height
+import com.tencent.kuikly.compose.foundation.layout.offset
 import com.tencent.kuikly.compose.foundation.layout.padding
 import com.tencent.kuikly.compose.foundation.layout.size
 import com.tencent.kuikly.compose.foundation.layout.width
@@ -48,10 +51,17 @@ import com.tencent.kuikly.compose.ui.layout.onGloballyPositioned
 import com.tencent.kuikly.compose.ui.text.font.FontWeight
 import com.tencent.kuikly.compose.ui.unit.dp
 import com.tencent.kuikly.compose.ui.unit.sp
+import com.tencent.kuikly.core.base.attr.ImageUri
 import com.tencent.kuikly.demo.pages.compose.chatDemo.configs.*
 
 // ==================== 半浮层动画时长 ====================
 private const val HALF_VIEW_ANIM_DURATION = 250
+private const val PAGE_NAME = "ChatDemo"
+
+// 图标资源路径
+private fun chevronUpIcon() = ImageUri.pageAssets("chevron_up@3x.png").toUrl(PAGE_NAME)
+private fun chevronDownIcon() = ImageUri.pageAssets("chevron_down@3x.png").toUrl(PAGE_NAME)
+private fun checkboxTickIcon() = ImageUri.pageAssets("checkbox_tick@3x.png").toUrl(PAGE_NAME)
 
 // ==================== 胶囊半浮层组件 ====================
 
@@ -238,37 +248,43 @@ private fun CapsuleHalfViewContent(
         onClose = onClose
     )
 
-    if (config.showTypeSection && config.typeItems.isNotEmpty()) {
-        HalfViewTypeSection(
-            title = config.typeTitle,
-            items = config.typeItems,
-            gridRows = config.typeGridRows,
-            onTypeSelected = { selectedType ->
-                config.typeItems.forEach { item ->
-                    if (item == selectedType) {
-                        item.picked.value = !item.picked.value
-                        if (item.picked.value) {
-                            config.requireBarItems.value = selectedType.requireBarItems
+    if (config.isAIDrawMode && config.aiDrawConfig != null) {
+        // AI 画图专属布局 - 参考 QQAIBiz QueryHalfDrawView
+        AIDrawHalfViewContent(config = config.aiDrawConfig)
+    } else {
+        // 通用半浮层布局（AI 写作等）
+        if (config.showTypeSection && config.typeItems.isNotEmpty()) {
+            HalfViewTypeSection(
+                title = config.typeTitle,
+                items = config.typeItems,
+                gridRows = config.typeGridRows,
+                onTypeSelected = { selectedType ->
+                    config.typeItems.forEach { item ->
+                        if (item == selectedType) {
+                            item.picked.value = !item.picked.value
+                            if (item.picked.value) {
+                                config.requireBarItems.value = selectedType.requireBarItems
+                            } else {
+                                config.requireBarItems.value = config.defaultTypeItem?.requireBarItems ?: emptyList()
+                            }
                         } else {
-                            config.requireBarItems.value = config.defaultTypeItem?.requireBarItems ?: emptyList()
+                            item.picked.value = false
                         }
-                    } else {
-                        item.picked.value = false
                     }
+                    val currentSelected = config.getSelectedTypeItem()
+                    val placeholder = currentSelected?.placeholder ?: config.defaultTypeItem?.placeholder ?: config.placeholder
+                    onPlaceholderChange(placeholder)
                 }
-                val currentSelected = config.getSelectedTypeItem()
-                val placeholder = currentSelected?.placeholder ?: config.defaultTypeItem?.placeholder ?: config.placeholder
-                onPlaceholderChange(placeholder)
-            }
-        )
-    }
+            )
+        }
 
-    if (config.showRequireSection && config.requireBarItems.value.isNotEmpty()) {
-        HalfViewRequireSection(
-            title = config.requireTitle,
-            items = config.requireBarItems.value,
-            showTitle = config.requireTitle.isNotEmpty()
-        )
+        if (config.showRequireSection && config.requireBarItems.value.isNotEmpty()) {
+            HalfViewRequireSection(
+                title = config.requireTitle,
+                items = config.requireBarItems.value,
+                showTitle = config.requireTitle.isNotEmpty()
+            )
+        }
     }
 
     Box(
@@ -277,6 +293,342 @@ private fun CapsuleHalfViewContent(
             .height(0.5.dp)
             .background(Color(0xFFE5E5E5))
     )
+}
+
+// ==================== AI 画图专属内容 ====================
+
+/**
+ * AI 画图半浮层内容
+ * 
+ * 参考 QQAIBiz QueryHalfDrawView 第 330-583 行：
+ * - 风格/比例展开按钮栏（互斥展开）
+ * - 风格卡片横向滚动列表（带缩略图 + 名称 + 选中标记）
+ * - 比例卡片横向滚动列表（带图标 + 子名称 + 选中标记）
+ */
+@Composable
+private fun AIDrawHalfViewContent(config: AIDrawConfig) {
+    // 固定高度容器，避免风格/比例区域展开收起时高度变化导致闪烁
+    // 高度 = 12(top) + 32(按钮栏) + 12(间距) + 80(卡片) + 16(bottom) = 152dp
+    val contentHeight = (12 + HALF_VIEW_TYPE_BUTTON_HEIGHT.value.toInt() + 12 + STYLE_CARD_HEIGHT.value.toInt() + 16).dp
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(contentHeight)
+    ) {
+    // 风格/比例展开按钮栏
+    // 参考 QQAIBiz QueryHalfDrawView 第 330-458 行
+    // localRequireBarItems 中每个按钮有 isSelected 控制箭头方向
+    // isStyleSectionExpanded / isRatioSectionExpanded 控制卡片区域显隐
+    Spacer(modifier = Modifier.height(12.dp))
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(HALF_VIEW_TYPE_BUTTON_HEIGHT),
+        contentPadding = PaddingValues(horizontal = HALF_VIEW_HORIZONTAL_PADDING),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // 风格按钮
+        item {
+            AIDrawExpandButton(
+                label = "风格",
+                display = config.getSelectedStyleName(),
+                isExpanded = config.isStyleExpanded.value,
+                onClick = {
+                    if (config.isStyleExpanded.value) {
+                        config.isStyleExpanded.value = false
+                    } else {
+                        config.isRatioExpanded.value = false
+                        config.isStyleExpanded.value = true
+                    }
+                }
+            )
+        }
+        // 比例按钮
+        item {
+            AIDrawExpandButton(
+                label = "比例",
+                display = config.getSelectedRatioName(),
+                isExpanded = config.isRatioExpanded.value,
+                onClick = {
+                    if (config.isRatioExpanded.value) {
+                        config.isRatioExpanded.value = false
+                    } else {
+                        config.isStyleExpanded.value = false
+                        config.isRatioExpanded.value = true
+                    }
+                }
+            )
+        }
+    }
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    // 风格选择卡片区域 - 只使用透明度动画
+    AnimatedVisibility(
+        visible = config.isStyleExpanded.value,
+        enter = com.tencent.kuikly.compose.animation.fadeIn(animationSpec = tween(150)),
+        exit = com.tencent.kuikly.compose.animation.fadeOut(animationSpec = tween(150))
+    ) {
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(STYLE_CARD_HEIGHT),
+            contentPadding = PaddingValues(horizontal = HALF_VIEW_HORIZONTAL_PADDING),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(config.styleItems) { item ->
+                StyleCard(
+                    item = item,
+                    isSelected = item.picked.value,
+                    onClick = {
+                        // 单选逻辑 - 参考 QQAIBiz 第 510-521 行
+                        var pickedItem: AIDrawStyleItem? = null
+                        config.styleItems.forEach {
+                            if (it == item) {
+                                it.picked.value = !it.picked.value
+                            } else {
+                                it.picked.value = false
+                            }
+                            if (it.picked.value) {
+                                pickedItem = it
+                            }
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    // 比例选择卡片区域 - 只使用透明度动画
+    AnimatedVisibility(
+        visible = config.isRatioExpanded.value,
+        enter = com.tencent.kuikly.compose.animation.fadeIn(animationSpec = tween(150)),
+        exit = com.tencent.kuikly.compose.animation.fadeOut(animationSpec = tween(150))
+    ) {
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(STYLE_CARD_HEIGHT),
+            contentPadding = PaddingValues(horizontal = HALF_VIEW_HORIZONTAL_PADDING),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(config.ratioItems) { item ->
+                RatioCard(
+                    item = item,
+                    isSelected = item.picked.value,
+                    onClick = {
+                        // 单选逻辑
+                        config.ratioItems.forEach {
+                            if (it == item) {
+                                it.picked.value = !it.picked.value
+                            } else {
+                                it.picked.value = false
+                            }
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
+    } // end fixed-height Column
+}
+
+/**
+ * AI 画图展开按钮 - 严格参考 QQAIBiz QueryHalfDrawView 第 346-457 行
+ * 
+ * 箭头方向参考第 449 行:
+ *   if (require.isSelected.value) "chevron_up" else "chevron_down"
+ * isSelected/isExpanded = true → chevron_up (∧)，表示点击可收起
+ * isSelected/isExpanded = false → chevron_down (∨)，表示点击可展开
+ */
+@Composable
+private fun AIDrawExpandButton(
+    label: String,
+    display: String,
+    isExpanded: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .height(HALF_VIEW_TYPE_BUTTON_HEIGHT)
+            .clip(RoundedCornerShape(12.dp))
+            .border(0.5.dp, Color(0xFFE5E5E5), RoundedCornerShape(12.dp))
+            .background(Color.White)
+            .clickable { onClick() }
+            .padding(horizontal = HALF_VIEW_TYPE_BUTTON_HEIGHT / 2),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 按钮名称
+        Text(
+            text = label,
+            fontSize = 14.sp,
+            color = Color(0xFF333333)
+        )
+        // 已选值显示 - 参考 QQAIBiz 第 438-444 行: require.display.value
+        if (display.isNotEmpty()) {
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = display,
+                fontSize = 14.sp,
+                color = Color(0xFF333333)
+            )
+        }
+        Spacer(modifier = Modifier.width(4.dp))
+        // 箭头方向 - 参考 QQAIBiz 第 449 行
+        @OptIn(InternalResourceApi::class)
+        Image(
+            painter = painterResource(
+                DrawableResource(if (isExpanded) chevronUpIcon() else chevronDownIcon())
+            ),
+            contentDescription = if (isExpanded) "collapse" else "expand",
+            modifier = Modifier.size(12.dp)
+        )
+    }
+}
+
+/**
+ * 风格卡片 - 参考 QQAIBiz QueryHalfDrawView StyleCard 第 586-642 行
+ * 
+ * 80dp 高，圆角 12dp，背景是网络图片，底部渐变遮罩 + 白色文字
+ * 选中时右上角显示打勾标记
+ */
+@Composable
+private fun StyleCard(
+    item: AIDrawStyleItem,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(STYLE_CARD_HEIGHT)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+    ) {
+        // 风格缩略图
+        Image(
+            painter = rememberAsyncImagePainter(item.url),
+            contentDescription = item.name,
+            contentScale = com.tencent.kuikly.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))
+        )
+
+        // 底部渐变遮罩
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(26.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    brush = com.tencent.kuikly.compose.ui.graphics.Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color(0xE6000000))
+                    ),
+                    shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
+                )
+        )
+
+        // 选中标记
+        if (isSelected) {
+            CheckedIndicator(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-4).dp, y = 4.dp)
+            )
+        }
+
+        // 风格名称
+        Text(
+            text = item.name,
+            fontSize = 12.sp,
+            color = Color.White,
+            maxLines = 1,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 8.dp)
+        )
+    }
+}
+
+/**
+ * 比例卡片 - 严格参考 QQAIBiz QueryHalfDrawView RatioCard 第 644-690 行
+ * 
+ * 80dp 高，圆角 12dp，灰色背景 + 顶部图标(28dp, paddingTop=18dp) + 底部文字(paddingBottom=8dp)
+ * 选中时右上角显示打勾标记
+ */
+@Composable
+private fun RatioCard(
+    item: AIDrawRatioItem,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(STYLE_CARD_HEIGHT)
+            .clip(RoundedCornerShape(12.dp))
+            .border(0.5.dp, Color(0xFFE5E5E5), RoundedCornerShape(12.dp))
+            .background(Color.White)
+            .clickable { onClick() }
+    ) {
+        // 比例图标 - 参考 QQAIBiz: size(28.dp).align(TopCenter).padding(top = 18.dp)
+        if (item.icon.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 14.dp)
+                    .size(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = rememberAsyncImagePainter(item.icon),
+                    contentDescription = item.name,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+
+        // 选中标记 - 参考 QQAIBiz: align(TopEnd).offset(x=(-4).dp, y=4.dp)
+        if (isSelected) {
+            CheckedIndicator(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-4).dp, y = 4.dp)
+            )
+        }
+
+        // 子名称 - 参考 QQAIBiz: align(BottomCenter).padding(bottom=8.dp), fontSize=14.dp
+        Text(
+            text = item.subName.ifEmpty { item.name },
+            fontSize = 14.sp,
+            color = Color(0xFF333333),
+            maxLines = 1,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 8.dp)
+        )
+    }
+}
+
+/**
+ * 选中状态打勾标记 - 参考 QQAIBiz CheckedIndicator
+ * 根据截图预期效果调整为 20dp 外框 + 16dp 图标
+ */
+@Composable
+private fun CheckedIndicator(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(20.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color.Black),
+        contentAlignment = Alignment.Center
+    ) {
+        @OptIn(InternalResourceApi::class)
+        Image(
+            painter = painterResource(DrawableResource(checkboxTickIcon())),
+            contentDescription = "checked",
+            modifier = Modifier.size(16.dp)
+        )
+    }
 }
 
 // ==================== 标题栏 ====================
@@ -328,6 +680,16 @@ private fun HalfViewTitleBar(
 
 // ==================== 类型选择区域 ====================
 
+/**
+ * 类型选择区域 - 参考 QQAIBiz QueryHalfWriteView
+ * 
+ * 使用 LazyHorizontalGrid 实现流式布局：
+ * - rows = GridCells.Fixed(2) - 固定 2 行
+ * - rowsSpacing = 8.dp - 行间距
+ * - columnsSpacing = 10.dp - 列间距
+ * 
+ * 关键：保证横向纵向间距一致
+ */
 @Composable
 private fun HalfViewTypeSection(
     title: String,
@@ -335,6 +697,10 @@ private fun HalfViewTypeSection(
     gridRows: Int,
     onTypeSelected: (HalfViewTypeItem) -> Unit
 ) {
+    // 间距常量 - 参考 QQAIBiz: rowsSpacing = 8.dp, columnsSpacing = 10.dp
+    val rowSpacing = 8.dp
+    val columnSpacing = 10.dp
+    
     Column(modifier = Modifier.fillMaxWidth()) {
         if (title.isNotEmpty()) {
             Text(
@@ -345,14 +711,21 @@ private fun HalfViewTypeSection(
                 modifier = Modifier.padding(start = HALF_VIEW_HORIZONTAL_PADDING, top = 12.dp, bottom = 6.dp)
             )
         }
+        
+        // Grid 高度 = 按钮高度 × 行数 + 行间距 × (行数 - 1)
+        // 参考 QQAIBiz: listHeight = layoutCapsuleTypeButtonHeight * 2 + 12.dp
+        val gridHeight = (HALF_VIEW_TYPE_BUTTON_HEIGHT * gridRows) + (rowSpacing * (gridRows - 1))
+        
         LazyHorizontalGrid(
             rows = GridCells.Fixed(gridRows),
             modifier = Modifier
                 .fillMaxWidth()
-                .height((HALF_VIEW_TYPE_BUTTON_HEIGHT.value * gridRows + (gridRows - 1) * 12f).dp),
+                .height(gridHeight),
             contentPadding = PaddingValues(horizontal = HALF_VIEW_HORIZONTAL_PADDING),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            // 列间距（横向间距）
+            horizontalArrangement = Arrangement.spacedBy(columnSpacing),
+            // 行间距（纵向间距）
+            verticalArrangement = Arrangement.spacedBy(rowSpacing)
         ) {
             items(items) { item ->
                 TypeButton(
@@ -456,7 +829,10 @@ private fun HalfViewRequireSection(
         popoverWidth = 160.dp,
         isTriangleTop = false,  // 三角形在底部，菜单在按钮上方
         onDismiss = {
-            // 点击背景关闭时，清空选中状态
+            // 点击背景关闭时，不立即清空数据
+        },
+        onAnimationFinished = {
+            // 退出动画完成后，清空选中状态（避免动画跳变）
             expandedItem.value = null
         }
     ) {
@@ -474,6 +850,7 @@ private fun HalfViewRequireSection(
                         .fillMaxWidth()
                         .height(44.dp)
                         .clickable {
+                            // 先更新选中状态
                             expandedItem.value?.let { currentItem ->
                                 currentItem.items.forEach {
                                     if (it == requireItem) {
@@ -483,7 +860,9 @@ private fun HalfViewRequireSection(
                                     }
                                 }
                             }
-                            expandedItem.value = null
+                            // 只关闭 Popover，不要立即清空 expandedItem
+                            // 等退出动画完成后，在 onAnimationFinished 中清空
+                            // 这样可以避免动画期间内容消失导致的闪烁
                             showPopover.value = false
                         }
                         .padding(horizontal = 16.dp),
@@ -496,12 +875,14 @@ private fun HalfViewRequireSection(
                         fontSize = 16.sp,
                         color = Color(0xFF333333)
                     )
-                    // 选中标记 - 参考 QQAIBiz: Image(src=QUIToken.image("check"), size=16dp)
+                    // 选中标记 - 增大尺寸以匹配预期效果
                     if (requireItem.picked.value) {
-                        Text(
-                            text = "✓",
-                            fontSize = 16.sp,
-                            color = Color(0xFF5B6CFF)
+                        @OptIn(InternalResourceApi::class)
+                        Image(
+                            painter = painterResource(DrawableResource(checkboxTickIcon())),
+                            contentDescription = "checked",
+                            modifier = Modifier.size(20.dp),
+                            colorFilter = com.tencent.kuikly.compose.ui.graphics.ColorFilter.tint(Color(0xFF5B6CFF))
                         )
                     }
                 }
@@ -548,10 +929,13 @@ private fun RequireBarButton(
             )
         }
         Spacer(modifier = Modifier.width(4.dp))
-        Text(
-            text = if (isExpanded) "▲" else "▼",
-            fontSize = 10.sp,
-            color = Color(0xFF999999)
+        @OptIn(InternalResourceApi::class)
+        Image(
+            painter = painterResource(
+                DrawableResource(if (isExpanded) chevronUpIcon() else chevronDownIcon())
+            ),
+            contentDescription = if (isExpanded) "collapse" else "expand",
+            modifier = Modifier.size(12.dp)
         )
     }
 }
